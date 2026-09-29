@@ -94,4 +94,7 @@ export default {
   "Day": "Tag",
   "City": "Stadt",
   "Unknown": "Unbekannt",
+  "Dashboard": "Dashboard",
+  "None": "Keine",
+  "Telemetry only, no cameras": "Nur Telemetrie, keine Kameras",
 };

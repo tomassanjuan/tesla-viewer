@@ -94,4 +94,7 @@ export default {
   "Day": "日",
   "City": "都市",
   "Unknown": "不明",
+  "Dashboard": "ダッシュボード",
+  "None": "なし",
+  "Telemetry only, no cameras": "テレメトリのみ（カメラなし）",
 };
