@@ -1,0 +1,10 @@
+.git
+.github
+node_modules
+test
+docs
+*.md
+package.json
+wrangler.jsonc
+.assetsignore
+.gitignore
