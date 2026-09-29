@@ -1,4 +1,4 @@
-import { groupFiles, tsToDate, CAMS } from './library.js';
+import { groupFiles, CAMS } from './library.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
@@ -30,12 +30,25 @@ async function addFiles(list) {
   if (events.length) openEvent(events[0]);
 }
 
+const dayLabel = (d) => {
+  const n = new Date(), k = (x) => x.toDateString();
+  if (k(d) === k(n)) return 'Today';
+  if (k(d) === k(new Date(n.getTime() - 864e5))) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+};
+
 function renderEvents() {
+  if (!document.getElementById('grp-css')) document.head.append(Object.assign(document.createElement('style'), { id: 'grp-css',
+    textContent: '.grp-h{margin:12px 4px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b93a1}.grp-h:first-child{margin-top:0}' }));
   $('events').innerHTML = '';
+  let day = null;
   for (const e of events) {
+    if (e.day !== day) {
+      day = e.day;
+      const h = document.createElement('div'); h.className = 'grp-h'; h.textContent = dayLabel(e.start); $('events').append(h);
+    }
     const d = document.createElement('div'); d.className = 'ev';
-    const first = tsToDate(e.segments[0].ts);
-    d.innerHTML = `<b>${e.name}</b><small>${first.toLocaleString()} · ${e.segments.length} min-clips</small>`;
+    d.innerHTML = `<b>${e.name}</b><small>${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min-clips</small>`;
     d.onclick = () => openEvent(e);
     e._el = d; $('events').append(d);
   }
@@ -51,25 +64,34 @@ async function openEvent(e) {
   const cams = CAMS.filter((c) => e.segments.some((s) => s.cams[c]));
   const segs = e.segments.map((s) => ({ ...s, dur: 0, start: 0 }));
   const samples = [];
-  let blocked = 0, t0 = 0, hevc = false;
+  let blocked = 0, t0 = 0, hevc = false, withTel = 0, codec = '', firstErr = '';
   for (const s of segs) {
     s.start = t0;
-    const f = s.cams.front ?? Object.values(s.cams)[0];
-    if (encrypted.has(f) && !decrypted.has(f)) { blocked++; s.dur = 60; t0 += 60; continue; }
-    try {
-      const c = parseClip(await resolve(f).arrayBuffer());
-      s.dur = c.duration; hevc ||= c.hevc;
-      for (const m of c.samples) samples.push({ ...m, t: m.t + t0 });
-    } catch { s.dur = await probeDuration(resolve(f)); }
+    const order = [...CAMS.filter((c) => s.cams[c]), ...Object.keys(s.cams).filter((c) => !CAMS.includes(c))];
+    if (order.every((c) => encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c]))) { blocked++; s.dur = 60; t0 += 60; continue; }
+    let dur = null;
+    for (const c of order) {
+      const f = s.cams[c];
+      if (encrypted.has(f) && !decrypted.has(f)) continue;
+      try {
+        const p = parseClip(await resolve(f).arrayBuffer());
+        codec ||= p.codec; dur ??= p.duration; hevc ||= p.hevc;
+        if (p.samples.length) { for (const m of p.samples) samples.push({ ...m, t: m.t + t0 }); withTel++; s.telCam = c; break; }
+      } catch (err) { s.err = `${c}: ${err.message}`; firstErr ||= `${s.ts} ${s.err}`; }
+    }
+    s.dur = dur ?? await probeDuration(resolve(s.cams[order.find((c) => !(encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c])))]));
     t0 += s.dur;
   }
-  ev = { e, cams, segs, samples, total: t0 };
+  const diag = { withTelemetry: withTel, total: segs.length, codec, firstError: firstErr };
+  ev = { e, cams, segs, samples, total: t0, diag };
   focusCam = cams.includes('front') ? 'front' : cams[0];
   buildGrid();
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
-  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet' : '';
+  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet'
+    : withTel < segs.length - blocked ? `${withTel}/${segs.length - blocked} clips have telemetry${firstErr ? ` (${firstErr})` : ''}` : '';
+  console.info('telemetry', diag);
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
 }

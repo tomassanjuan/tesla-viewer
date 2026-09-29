@@ -7,25 +7,49 @@ export function parseName(path) {
   return m ? { ts: m[1], cam: m[2].toLowerCase() } : null;
 }
 
+export const TRIP_GAP_S = 120;    // new trip when a segment starts > this long after the previous one ended (~60 s clips)
+export const EVENT_GAP_S = 600;   // same rule, inside SavedClips/SentryClips event dirs
+const SEG_S = 60;
+const p2 = (n) => String(n).padStart(2, '0');
+const dayKey = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+const dur = (n) => { const m = n; return m >= 60 ? `${Math.floor(m / 60)} h ${p2(m % 60)} min` : `${m} min`; };
+
+/** Split sorted segments where start - (prevStart + 60 s) > gapS. */
+function splitByGap(segs, gapS) {
+  const runs = [];
+  let prev = null;
+  for (const s of segs) {
+    const t = tsToDate(s.ts).getTime();
+    if (!prev || (t - prev) / 1000 - SEG_S > gapS) runs.push([]);
+    runs[runs.length - 1].push(s); prev = t;
+  }
+  return runs;
+}
+
 /** files: [{path, file}] where path is the relative path (folders give event names). */
 export function groupFiles(files) {
-  const events = new Map();
+  const dirs = new Map(), loose = new Map();
   for (const { path, file } of files) {
     const p = parseName(path);
     if (!p) continue;
     const parts = path.split('/');
     const dir = parts.length > 1 ? parts.slice(-2, -1)[0] : '';
     const isRecent = /RecentClips/i.test(path) || !/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/.test(dir);
-    const key = isRecent ? 'Recent / loose clips' : dir;
-    const ev = events.get(key) ?? { name: key, segMap: new Map() };
-    events.set(key, ev);
-    const seg = ev.segMap.get(p.ts) ?? { ts: p.ts, cams: {} };
-    ev.segMap.set(p.ts, seg);
+    const m = isRecent ? loose : (dirs.get(dir) ?? dirs.set(dir, new Map()).get(dir));
+    const seg = m.get(p.ts) ?? { ts: p.ts, cams: {} };
+    m.set(p.ts, seg);
     seg.cams[p.cam] = file;
   }
-  return [...events.values()]
-    .map((e) => ({ name: e.name, segments: [...e.segMap.values()].sort((a, b) => a.ts.localeCompare(b.ts)) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = (m) => [...m.values()].sort((a, b) => a.ts.localeCompare(b.ts));
+  const mk = (kind, name, segments) => {
+    const start = tsToDate(segments[0].ts);
+    return { name: name ?? `Trip ${p2(start.getHours())}:${p2(start.getMinutes())} · ${dur(segments.length)}`, segments, start, kind, day: dayKey(start) };
+  };
+  const out = [];
+  for (const [dir, m] of dirs)
+    splitByGap(sorted(m), EVENT_GAP_S).forEach((r, i) => out.push(mk('event', i ? `${dir} (${i + 1})` : dir, r)));
+  if (loose.size) for (const r of splitByGap(sorted(loose), TRIP_GAP_S)) out.push(mk('trip', null, r));
+  return out.sort((a, b) => b.start - a.start);
 }
 
 export function tsToDate(ts) {

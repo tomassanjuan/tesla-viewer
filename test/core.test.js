@@ -61,6 +61,19 @@ test('parseClip flags HEVC without throwing or decoding telemetry', () => {
   assert.ok(Math.abs(c.duration - 0.1) < 1e-9);
 });
 
+const ab = (b) => b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
+test('parseClip: moov after mdat, multiple mdat, largesize mdat', () => {
+  const m = makeMp4();
+  const iMoov = m.indexOf(Buffer.from('moov')) - 4, iMdat = m.indexOf(Buffer.from('mdat')) - 4;
+  const ftyp = m.subarray(0, iMoov), moov = m.subarray(iMoov, iMdat), body = m.subarray(iMdat + 8);
+  const big = Buffer.concat([u32(1), Buffer.from('mdat'), Buffer.alloc(8), body]); big.writeBigUInt64BE(BigInt(big.length), 8);
+  let c = parseClip(ab(Buffer.concat([ftyp, big, moov])));
+  assert.equal(c.samples.length, 1); assert.equal(c.samples[0].speedMps, 12.5);
+  const cut = 4 + seiNal(seiPayload()).length + 8;   // after SEI + IDR
+  c = parseClip(ab(Buffer.concat([ftyp, moov, box('mdat', body.subarray(0, cut)), box('mdat', body.subarray(cut))])));
+  assert.equal(c.samples.length, 1); assert.ok(Math.abs(c.duration - 0.1) < 1e-9);
+});
+
 test('groupFiles builds events and sorted segments', () => {
   const f = (path) => ({ path, file: path });
   const ev = groupFiles([
