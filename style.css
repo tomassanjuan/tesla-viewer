@@ -105,7 +105,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 #grid.focus .cam:not(.main){display:none}
 #grid.focus .cam{outline-color:transparent}
 #empty{position:absolute;inset:0;display:grid;place-items:center;padding:var(--s4);background:radial-gradient(90% 80% at 50% 0%,color-mix(in srgb,var(--accent) 14%,var(--bg)),var(--bg) 70%);z-index:2}
-#drop{width:min(560px,100%);text-align:center;padding:var(--s6) var(--s5);border:2px dashed var(--border);border-radius:var(--r-lg);background:var(--glass);backdrop-filter:blur(8px);transition:border-color .2s,transform .2s,background .2s}
+#drop{width:min(560px,100%);text-align:center;padding:var(--s6) var(--s5);border:2px dashed var(--border);border-radius:var(--r-lg);background:color-mix(in srgb,var(--surface) 88%,transparent);backdrop-filter:blur(8px);transition:border-color .2s,transform .2s,background .2s}
 #drop.over{border-color:var(--accent);transform:scale(1.015);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
 .drop-art{color:var(--accent);margin-bottom:var(--s3)}
 #drop h2{font-size:22px;letter-spacing:-.01em;margin-bottom:var(--s2)}
@@ -217,3 +217,8 @@ canvas{background:transparent}
 }
 @media (max-width:480px){.sel span{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+
+.blur-btn{font:inherit;font-weight:500;min-height:36px;padding:0 var(--s3);border-radius:var(--r-pill);border:1px solid var(--border);background:var(--surface-2);color:var(--fg);cursor:pointer}
+.blur-btn:hover{border-color:var(--accent)}
+.blur-btn:focus-visible{outline:none;box-shadow:var(--ring)}
+@media(max-width:800px){#map{height:auto;aspect-ratio:2/1;max-height:200px}}
