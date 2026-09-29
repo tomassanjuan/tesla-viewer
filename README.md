@@ -15,4 +15,4 @@ Free, on-device clone of tesclip.com: view TeslaCam / Sentry clips in synced mul
 See [ROADMAP.md](ROADMAP.md) for status and next steps. Format credits: [teslamotors/dashcam](https://github.com/teslamotors/dashcam), [XGxF3/tesla-dashcam-decrypt](https://github.com/XGxF3/tesla-dashcam-decrypt).
 
 ## Deploys and previews
-Cloudflare Workers Builds deploys `main` with `npx wrangler deploy` (config in `wrangler.jsonc`, no build step). For per-branch previews, enable non-production branch builds in the Cloudflare dashboard (Worker > Settings > Builds) and set the non-production deploy command to `npx wrangler versions upload`, so branches never overwrite production.
+Cloudflare Workers Builds deploys `main` with `npx wrangler deploy` (config in `wrangler.jsonc`, no build step). For per-branch previews, enable non-production branch builds in the Cloudflare dashboard (Worker > Settings > Builds) and use `npx wrangler preview` as the non-production command (it needs the `previews` block in `wrangler.jsonc`), so branches never overwrite production.
