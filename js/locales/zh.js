@@ -85,4 +85,11 @@ export default {
   "Honk": "鸣笛",
   "Other": "其他",
   "No events match this filter.": "没有符合此筛选条件的事件。",
+  "Telemetry": "遥测",
+  "Telemetry available": "有遥测数据",
+  "Group by": "分组方式",
+  "No grouping": "不分组",
+  "Day": "日期",
+  "City": "城市",
+  "Unknown": "未知",
 };

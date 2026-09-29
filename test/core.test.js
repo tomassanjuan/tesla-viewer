@@ -117,3 +117,25 @@ test('categories and event-type filtering', async () => {
   assert.equal(filterEvents(evs, { category: 'saved', type: 'sentry' }).length, 0);
   assert.equal(eventType(evs.find((e) => e.category === 'recent')), null);
 });
+
+test('groupEvents by day / city; formatEventInfo city', async () => {
+  const { groupEvents, formatEventInfo } = await import('../js/library.js');
+  const e = (ts, city) => ({ segments: [{ ts }], city });
+  const evs = [e('2026-06-01_10-00-00', 'Oslo'), e('2026-06-01_12-00-00'), e('2026-06-02_10-00-00', 'Bergen'), e('2026-06-02_11-00-00', 'Oslo')];
+  assert.equal(groupEvents(evs, 'none').length, 1);
+  assert.deepEqual(groupEvents(evs, 'day').map((g) => [g.key, g.events.length]), [['2026-06-01', 2], ['2026-06-02', 2]]);
+  assert.deepEqual(groupEvents(evs, 'city').map((g) => [g.key, g.events.length]), [['Bergen', 1], ['Oslo', 2], ['', 1]]);
+  assert.equal(formatEventInfo({ city: ' Oslo ', street: 'X' }).city, 'Oslo');
+});
+
+test('hasSei: probes head for a Tesla SEI before the first slice', async () => {
+  const { hasSei } = await import('../js/mp4.js');
+  const box = (type, payload) => { const b = new Uint8Array(8 + payload.length); new DataView(b.buffer).setUint32(0, b.length); b.set([...type].map((c) => c.charCodeAt(0)), 4); b.set(payload, 8); return b; };
+  const nal = (bytes) => { const n = new Uint8Array(4 + bytes.length); new DataView(n.buffer).setUint32(0, bytes.length); n.set(bytes, 4); return n; };
+  const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let p = 0; for (const x of a) { o.set(x, p); p += x.length; } return o; };
+  const sei = nal([6, 5, 0x99, 0x42, 0x42, 0x69, 0x08, 0x96, 0x01, 0x80]);   // field 1 varint = 150
+  const slice = nal([0x65, 0, 0, 0, 0]);
+  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', cat(sei, slice))).buffer), true);
+  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', slice)).buffer), false);
+  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4))).buffer), null);
+});

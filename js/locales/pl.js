@@ -85,4 +85,11 @@ export default {
   "Honk": "Klakson",
   "Other": "Inne",
   "No events match this filter.": "Brak zdarzeń pasujących do filtra.",
+  "Telemetry": "Telemetria",
+  "Telemetry available": "Telemetria dostępna",
+  "Group by": "Grupuj według",
+  "No grouping": "Bez grupowania",
+  "Day": "Dzień",
+  "City": "Miasto",
+  "Unknown": "Nieznane",
 };

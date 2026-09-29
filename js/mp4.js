@@ -75,3 +75,28 @@ export function parseClip(buffer) {
 export function isMp4(u8) {
   return u8.length > 12 && String.fromCharCode(u8[4], u8[5], u8[6], u8[7]) === 'ftyp';
 }
+
+/**
+ * Cheap telemetry probe on the first bytes of a clip (H.264 only): walks to mdat, then the NALs before the first
+ * slice, looking for a Tesla SEI. Returns true/false, or null when the head can't tell (HEVC, no mdat in range).
+ */
+export function hasSei(buffer) {
+  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
+  let pos = 0;
+  for (; pos + 8 <= dv.byteLength; ) {
+    const size = dv.getUint32(pos);
+    if (ascii(dv, pos + 4) === 'mdat') break;
+    if (size < 8) return null;
+    pos += size;
+  }
+  if (pos + 8 > dv.byteLength) return null;
+  for (let c = pos + 8; c + 5 <= dv.byteLength;) {
+    const len = dv.getUint32(c); c += 4;
+    if (len < 1 || c + len > dv.byteLength) return null;
+    const type = u8[c] & 0x1f;
+    if (type === 6 && decodeSei(u8.subarray(c, c + len))) return true;
+    if (type === 5 || type === 1) return false;
+    c += len;
+  }
+  return null;
+}

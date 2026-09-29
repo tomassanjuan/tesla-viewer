@@ -85,4 +85,11 @@ export default {
   "Honk": "Klaxon",
   "Other": "Autre",
   "No events match this filter.": "Aucun événement ne correspond à ce filtre.",
+  "Telemetry": "Télémétrie",
+  "Telemetry available": "Télémétrie disponible",
+  "Group by": "Grouper par",
+  "No grouping": "Aucun groupe",
+  "Day": "Jour",
+  "City": "Ville",
+  "Unknown": "Inconnue",
 };

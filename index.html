@@ -47,6 +47,9 @@
   <h2 class="eyebrow">Library</h2>
   <div id="cats" class="cats" role="group" aria-label="Category"></div>
   <select id="evtype" aria-label="Event type" hidden></select>
+  <select id="groupby" aria-label="Group by" hidden>
+    <option value="none">No grouping</option><option value="day">Day</option><option value="city">City</option>
+  </select>
   <div id="events" role="list"></div>
   <details id="crypt"><summary>Encrypted clips (2026.20+) <em>experimental</em></summary>
     <p class="note">Decryption runs locally. The per-file key comes from Tesla, tied to your account.</p>

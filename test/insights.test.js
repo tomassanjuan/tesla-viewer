@@ -65,7 +65,7 @@ test('groupFiles attaches event.json and thumb.png to their event', () => {
 
 test('formatEventInfo', () => {
   assert.deepEqual(formatEventInfo({ reason: 'sentry_aware_object_detection', city: 'Oslo', street: 'Main St' }),
-    { reason: 'Sentry: object detected', place: 'Main St, Oslo' });
+    { reason: 'Sentry: object detected', place: 'Main St, Oslo', city: 'Oslo' });
   assert.equal(formatEventInfo({ reason: 'user_interaction_foo_bar', est_lat: '59.9', est_lon: '10.75' }).place, '59.9000, 10.7500');
-  assert.deepEqual(formatEventInfo(null), { reason: '', place: '' });
+  assert.deepEqual(formatEventInfo(null), { reason: '', place: '', city: '' });
 });
