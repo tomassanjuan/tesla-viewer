@@ -54,14 +54,17 @@ function renderFilters() {
     b.onclick = () => { filter.category = k; renderEvents(); };
     box.append(b);
   }
-  const sel = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
-  sel.innerHTML = ''; sel.add(new Option(t('All event types'), ''));
-  for (const k of EVENT_TYPES) if (byType[k]) sel.add(new Option(`${TYPE_LABEL[k]} (${byType[k]})`, k));
+  const tbox = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
+  tbox.innerHTML = '';
   if (!byType[filter.type]) filter.type = '';
-  sel.value = filter.type; sel.hidden = !events.length;
+  for (const k of EVENT_TYPES) if (byType[k]) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
+    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${TYPE_LABEL[k]} ${byType[k]}`;
+    b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
+    tbox.append(b);
+  }
 }
 document.addEventListener('langchange', () => events.length && renderEvents());
-$('evtype').onchange = (e) => { filter.type = e.target.value; renderEvents(); };
 
 const thumbUrls = [];
 function renderEvents() {
@@ -152,12 +155,21 @@ function buildGrid() {
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
-    d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
-    d.onclick = () => setFocus(c);
-    d.onkeydown = (k) => { if (k.key === 'Enter') setFocus(c); };
+    d.tabIndex = 0; d.title = d.ariaLabel = `${NAMES[c]}: ${t('Click to enlarge')}`;
+    d.onclick = () => toggleFocus(c);
+    d.onkeydown = (k) => { if (k.key === 'Enter') toggleFocus(c); };
+    d.ondblclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else d.requestFullscreen?.().catch(() => {}); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
+}
+
+// click a camera to enlarge it; click the enlarged camera to return to the grid
+function toggleFocus(c) {
+  const sel = $('layout'), at = master()?.currentTime;
+  focusCam = c;
+  sel.value = sel.value === 'focus' ? 'auto' : 'focus';
+  applyLayout(); resync(at); // hidden tiles are paused in focus layout; re-sync them on any change
 }
 
 function applyLayout() {
@@ -196,7 +208,6 @@ let lowLoad = false, lastUi = 0, lastDrift = 0, lastHud = '';
 const UI_HZ = 12, DRIFT_MS = 500;
 // bring paused/hidden tiles back to the master's time and apply play state (after solo mode changes)
 function resync(at = master()?.currentTime) { if (at != null) for (const v of Object.values(vids)) if (v.src && Math.abs(v.currentTime - at) > 0.05) v.currentTime = at; syncPlayState(); }
-function setFocus(c) { const at = master()?.currentTime; focusCam = c; applyLayout(); resync(at); }
 const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
 function playAll() { playing = true; $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
 function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
@@ -327,6 +338,7 @@ $('csv').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'Escape' && $('layout').value === 'focus') { $('layout').value = 'auto'; applyLayout(); }
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
