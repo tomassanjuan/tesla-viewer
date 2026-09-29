@@ -65,6 +65,7 @@
 </aside>
 
 <main>
+  <div id="topbar"></div>
   <div id="stage">
     <div id="grid"></div>
     <div id="empty">
@@ -103,7 +104,8 @@
         <button id="setIn" class="btn" type="button" title="Set trim start"><svg class="ic"><use href="#i-in"/></svg>In</button>
         <button id="setOut" class="btn" type="button" title="Set trim end"><svg class="ic"><use href="#i-out"/></svg>Out</button>
         <button id="export" class="btn primary" type="button"><svg class="ic"><use href="#i-export"/></svg>Export</button>
-        <label class="chip"><input type="checkbox" id="expHud" checked>HUD</label>
+        <label class="chip"><input type="checkbox" id="expHud" checked>HUD in export</label>
+        <label class="chip"><input type="checkbox" id="showHud" checked>Show HUD</label>
         <label class="chip" title="Exports only the camera you enlarged by clicking it"><input type="checkbox" id="expFocus">Enlarged cam only</label>
         <small id="trimInfo" class="note"></small>
       </div>

@@ -12,7 +12,7 @@ const f32 = (v) => { const b = Buffer.alloc(4); b.writeFloatLE(v); return [...b]
 const f64 = (v) => { const b = Buffer.alloc(8); b.writeDoubleLE(v); return [...b]; };
 function seiPayload() {
   return Uint8Array.from([
-    0x08, 2, 0x10, 1, 0x18, ...varint(300), 0x25, ...f32(12.5), 0x35, ...f32(-3), 0x38, 1, 0x50, 2,
+    0x08, 2, 0x10, 1, 0x18, ...varint(300), 0x25, ...f32(12.5), 0x2d, ...f32(55), 0x35, ...f32(-3), 0x38, 1, 0x50, 2,
     0x59, ...f64(40.5), 0x61, ...f64(-3.7),
   ]);
 }
@@ -45,6 +45,7 @@ test('SEI decode with emulation prevention', () => {
   const m = decodeSei(seiNal(seiPayload()));
   assert.equal(m.gear, 1); assert.equal(m.frameSeq, 300); assert.equal(m.speedMps, 12.5);
   assert.equal(m.steering, -3); assert.equal(m.blinkerLeft, true); assert.equal(m.autopilot, 2);
+  assert.ok(Math.abs(m.accel - 0.55) < 1e-6); // raw 55 (0-100) -> 0..1
   assert.equal(m.lat, 40.5); assert.equal(m.lon, -3.7);
 });
 

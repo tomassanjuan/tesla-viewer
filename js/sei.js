@@ -22,6 +22,7 @@ export function telemetryFromProto(bytes, strict = false) {
   if (strict && !hit) return null;
   for (const [n, v] of Object.entries(f)) if (!SCHEMA[n] || typeof v !== 'number') raw[n] = v;
   for (const k of ['blinkerLeft', 'blinkerRight', 'brake']) m[k] = !!m[k];
+  m.accel = Math.min(1, Math.max(0, m.accel / 100)); // Tesla reports 0-100; expose 0..1
   if (Object.keys(raw).length) m.raw = raw;
   return m;
 }
