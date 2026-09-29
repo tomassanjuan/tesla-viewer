@@ -11,20 +11,37 @@ const SCHEMA = {
   13: ['heading', 'd'], 14: ['ax', 'd'], 15: ['ay', 'd'], 16: ['az', 'd'],
 };
 
-/** Decode one SEI NAL unit (starting at the NAL header byte) into a telemetry object, or null. */
+/**
+ * Map protobuf bytes onto SCHEMA. Unknown fields / wrongly-typed values are kept in `raw`.
+ * strict: return null unless at least one schema field matched (used to reject non-Tesla SEI).
+ */
+export function telemetryFromProto(bytes, strict = false) {
+  const f = decodeWire(bytes), m = {}, raw = {};
+  let hit = 0;
+  for (const [n, [name]] of Object.entries(SCHEMA)) { const ok = typeof f[n] === 'number'; hit += ok; m[name] = ok ? f[n] : 0; }
+  if (strict && !hit) return null;
+  for (const [n, v] of Object.entries(f)) if (!SCHEMA[n] || typeof v !== 'number') raw[n] = v;
+  for (const k of ['blinkerLeft', 'blinkerRight', 'brake']) m[k] = !!m[k];
+  m.accel = Math.min(1, Math.max(0, m.accel / 100)); // Tesla reports 0-100; expose 0..1
+  if (Object.keys(raw).length) m.raw = raw;
+  return m;
+}
+
+/** Diagnose a schema mismatch: fields (with wire types) present in a payload vs. the known schema. */
+export function fieldsSeen(bytes) {
+  const wires = {}; decodeWire(bytes, wires);
+  const NAMES = ['varint', 'fixed64', 'bytes', 'group', 'group', 'fixed32'];
+  const seen = Object.entries(wires).map(([n, w]) => ({ field: +n, wire: NAMES[w], name: SCHEMA[n]?.[0] ?? null }));
+  return { seen, unknown: seen.filter((x) => !x.name).map((x) => x.field), missing: Object.keys(SCHEMA).filter((n) => !(n in wires)).map(Number) };
+}
+
+/** Decode one H.264 SEI NAL unit (starting at the NAL header byte) into a telemetry object, or null. */
 export function decodeSei(nal) {
   if (nal.length < 4) return null;
   let i = 3;
   while (i < nal.length && nal[i] === 0x42) i++;
   if (i <= 3 || i + 1 >= nal.length || nal[i] !== 0x69) return null;
-  try {
-    const raw = decodeWire(stripEmulation(nal.subarray(i + 1, nal.length - 1)));
-    const m = {};
-    for (const [n, [name]] of Object.entries(SCHEMA)) m[name] = raw[n] ?? 0;
-    for (const k of ['blinkerLeft', 'blinkerRight', 'brake']) m[k] = !!m[k];
-    m.accel = Math.min(1, Math.max(0, m.accel / 100)); // Tesla reports 0-100; expose 0..1
-    return m;
-  } catch { return null; }
+  return telemetryFromProto(stripEmulation(nal.subarray(i + 1, nal.length - 1)));
 }
 
 export function stripEmulation(data) {
