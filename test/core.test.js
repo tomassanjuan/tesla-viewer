@@ -1,0 +1,91 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash, createCipheriv, webcrypto } from 'node:crypto';
+import { md5 } from '../js/md5.js';
+import { decodeSei } from '../js/sei.js';
+import { parseClip } from '../js/mp4.js';
+import { groupFiles } from '../js/library.js';
+import { isEncrypted, parseHeader, decrypt, pageIv } from '../js/tesla-crypto.js';
+
+const varint = (n) => { const o = []; while (n > 127) { o.push((n & 127) | 128); n = Math.floor(n / 128); } o.push(n); return o; };
+const f32 = (v) => { const b = Buffer.alloc(4); b.writeFloatLE(v); return [...b]; };
+const f64 = (v) => { const b = Buffer.alloc(8); b.writeDoubleLE(v); return [...b]; };
+function seiPayload() {
+  return Uint8Array.from([
+    0x08, 2, 0x10, 1, 0x18, ...varint(300), 0x25, ...f32(12.5), 0x35, ...f32(-3), 0x38, 1, 0x50, 2,
+    0x59, ...f64(40.5), 0x61, ...f64(-3.7),
+  ]);
+}
+function seiNal(payload) {
+  const esc = []; let z = 0;
+  for (const b of payload) { if (z >= 2 && b <= 3) { esc.push(3); z = 0; } esc.push(b); z = b === 0 ? z + 1 : 0; }
+  return Uint8Array.from([0x06, 0x05, 0xff, 0x42, 0x42, 0x69, ...esc, 0x80]);
+}
+const box = (type, ...kids) => { const body = Buffer.concat(kids.map((k) => Buffer.from(k))); const h = Buffer.alloc(8); h.writeUInt32BE(body.length + 8); h.write(type, 4); return Buffer.concat([h, body]); };
+const u32 = (...v) => { const b = Buffer.alloc(4 * v.length); v.forEach((x, i) => b.writeUInt32BE(x, i * 4)); return b; };
+
+function makeMp4() {
+  const nals = [seiNal(seiPayload()), [0x65, 1, 2, 3], [0x41, 9, 9], [0x41, 9, 9]];
+  const mdatBody = Buffer.concat(nals.map((n) => Buffer.concat([u32(n.length), Buffer.from(n)])));
+  const entry = Buffer.alloc(8 + 78); entry.write('avc1', 4); entry.writeUInt32BE(entry.length, 0);
+  entry.writeUInt16BE(1280, 8 + 24); entry.writeUInt16BE(960, 8 + 26);
+  const stsd = box('stsd', u32(0, 1), entry);
+  const stts = box('stts', u32(0, 1, 3, 1000));
+  const mdhd = box('mdhd', u32(0, 0, 0, 30000, 0), Buffer.alloc(4));
+  const moov = box('moov', box('trak', box('mdia', mdhd, box('minf', box('stbl', stsd, stts)))));
+  return Buffer.concat([box('ftyp', Buffer.from('isom0000')), moov, box('mdat', mdatBody)]);
+}
+
+test('md5 matches node', () => {
+  for (const s of ['', 'a', 'x'.repeat(55), 'x'.repeat(64), 'x'.repeat(1000)])
+    assert.equal(Buffer.from(md5(Buffer.from(s))).toString('hex'), createHash('md5').update(s).digest('hex'));
+});
+
+test('SEI decode with emulation prevention', () => {
+  const m = decodeSei(seiNal(seiPayload()));
+  assert.equal(m.gear, 1); assert.equal(m.frameSeq, 300); assert.equal(m.speedMps, 12.5);
+  assert.equal(m.steering, -3); assert.equal(m.blinkerLeft, true); assert.equal(m.autopilot, 2);
+  assert.equal(m.lat, 40.5); assert.equal(m.lon, -3.7);
+});
+
+test('parseClip returns per-frame telemetry and timing', () => {
+  const b = makeMp4(); const c = parseClip(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
+  assert.equal(c.width, 1280); assert.equal(c.height, 960);
+  assert.ok(Math.abs(c.duration - 0.1) < 1e-9);
+  assert.equal(c.samples.length, 1); assert.equal(c.samples[0].speedMps, 12.5);
+});
+
+test('groupFiles builds events and sorted segments', () => {
+  const f = (path) => ({ path, file: path });
+  const ev = groupFiles([
+    f('TeslaCam/SentryClips/2026-06-01_10-00-00/2026-06-01_10-01-00-front.mp4'),
+    f('TeslaCam/SentryClips/2026-06-01_10-00-00/2026-06-01_10-00-00-front.mp4'),
+    f('TeslaCam/SentryClips/2026-06-01_10-00-00/2026-06-01_10-00-00-back.mp4'),
+    f('TeslaCam/RecentClips/2026-06-02_09-00-00-left_pillar.mp4'), f('x/event.json')]);
+  assert.equal(ev.length, 2);
+  const s = ev.find((e) => e.name === '2026-06-01_10-00-00');
+  assert.deepEqual(s.segments.map((x) => x.ts), ['2026-06-01_10-00-00', '2026-06-01_10-01-00']);
+  assert.deepEqual(Object.keys(s.segments[0].cams).sort(), ['back', 'front']);
+});
+
+test('decrypt roundtrip with the documented scheme', async () => {
+  const plain = Buffer.from(makeMp4()); const key = Buffer.from('0123456789abcdef');
+  const pages = Math.ceil(plain.length / 4096);
+  const file = Buffer.alloc(0x2000 + pages * 4096);
+  Buffer.from('00112233445566778899aabbccddeeff', 'hex').copy(file, 4);
+  file.writeBigUInt64BE(BigInt(plain.length), 0); file.writeUInt32BE(4096, 0x14); // note: size and id overlap at bytes 4-7 in the documented layout
+  file.writeUInt32BE(1, 0x1000); file[0x1004] = 4; file.write('5YJ3E1EA7KF000000', 0x1045);
+  const root = createHash('md5').update(key).digest();
+  for (let p = 0; p < pages; p++) {
+    const blk = Buffer.alloc(4096); plain.copy(blk, 0, p * 4096, (p + 1) * 4096);
+    const iv = createHash('md5').update(Buffer.concat([root, Buffer.from(String(p)), Buffer.alloc(32 - 16 - String(p).length)])).digest();
+    assert.deepEqual(Buffer.from(pageIv(root, p)), iv);
+    const c = createCipheriv('aes-128-cbc', key, iv).setAutoPadding(false);
+    Buffer.concat([c.update(blk), c.final()]).copy(file, 0x2000 + p * 4096);
+  }
+  const u8 = new Uint8Array(file);
+  assert.ok(isEncrypted(u8));
+  assert.equal(parseHeader(u8).id.length, 36);
+  const out = await decrypt(u8, new Uint8Array(key), webcrypto.subtle);
+  assert.deepEqual(Buffer.from(out), plain);
+});
