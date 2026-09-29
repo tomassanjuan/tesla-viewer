@@ -72,7 +72,7 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
-  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet' : '';
+  $('status').textContent = hevc && !samples.length ? 'HEVC clip: video plays if your browser supports it; no telemetry found' : '';
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
 }
