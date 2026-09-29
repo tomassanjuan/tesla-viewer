@@ -309,6 +309,15 @@ canvas{background:transparent}
   #extras-dock button{font:inherit;font-weight:500;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-pill);min-height:40px;padding:0 var(--s3);cursor:pointer}
   #extras-dock button[aria-pressed=true]{background:var(--accent);border-color:transparent;color:var(--on-accent)}
 
+  /* nothing loaded yet: no pinned video/dock, just a compact drop zone above the (scrolling) controls */
+  main:has(#empty:not([hidden])) #stage{position:relative;top:auto;height:auto;overflow:visible;display:block}
+  main:has(#empty:not([hidden])) #empty{position:static;padding:var(--s3)}
+  main:has(#empty:not([hidden])) #drop{padding:var(--s5) var(--s4)}
+  main:has(#empty:not([hidden])) #drop p:not(.privacy){display:none}
+  main:has(#empty:not([hidden])) .scrub,main:has(#empty:not([hidden])) .dock-row>.grp:first-child{position:static}
+  main:has(#empty:not([hidden])) #grid{display:none}
+  main:has(#empty:not([hidden])){display:block}
+
   #panels{flex-direction:column;padding:var(--s3) var(--s4) var(--s5)}
   #graph{aspect-ratio:3/1}
   #mapbox{width:100%}
