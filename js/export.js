@@ -1,3 +1,5 @@
+import { drawBlurs } from './blur.js';
+import { t } from './i18n.js';
 // Trim + export: records a canvas composite of the playing <video>s via MediaRecorder. Fully in-browser.
 // ponytail: real-time recording (export takes as long as the range); WebCodecs faster-than-realtime muxing is a later upgrade.
 
@@ -42,11 +44,12 @@ function drawFrame(x, api, opt, W, H) {
     if (!v?.videoWidth) continue;
     const k = Math.min(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k;
     x.drawImage(v, X + (w - dw) / 2, Y + (h - dh) / 2, dw, dh);
+    drawBlurs(x, c, { x: X + (w - dw) / 2, y: Y + (h - dh) / 2, w: dw, h: dh }, v, api.globalTime());
   }
   const m = opt.hud && api.sampleAt(api.globalTime());
   if (m) {
     const kmh = api.units() === 'kmh';
-    const txt = `${Math.round(m.speedMps * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}   steer ${m.steering.toFixed(0)}°   throttle ${(m.accel * 100).toFixed(0)}%${m.brake ? '   BRAKE' : ''}${m.blinkerLeft ? '  ◀' : ''}${m.blinkerRight ? '  ▶' : ''}`;
+    const txt = `${Math.round(m.speedMps * (kmh ? 3.6 : 2.23694))} ${kmh ? 'km/h' : 'mph'}   ${t('STEER')} ${m.steering.toFixed(0)}°   ${t('THROTTLE')} ${(m.accel * 100).toFixed(0)}%${m.brake ? '   ' + t('BRAKE') : ''}${m.blinkerLeft ? '  ◀' : ''}${m.blinkerRight ? '  ▶' : ''}`;
     x.font = '600 24px system-ui,sans-serif';
     const tw = x.measureText(txt).width + 32;
     x.fillStyle = '#000b'; x.fillRect((W - tw) / 2, H - 56, tw, 40);
@@ -56,7 +59,7 @@ function drawFrame(x, api, opt, W, H) {
 
 export async function exportRange(api, start, end, opt, onStatus = () => {}) {
   const pick = pickMime((t) => MediaRecorder.isTypeSupported(t));
-  if (!pick) throw new Error('MediaRecorder has no mp4/webm support in this browser');
+  if (!pick) throw new Error(t('MediaRecorder has no mp4/webm support in this browser'));
   const W = 1280, H = 720, cv = Object.assign(document.createElement('canvas'), { width: W, height: H }), x = cv.getContext('2d');
   const speed = document.getElementById('speed'), oldSpeed = speed.value;
   speed.value = '1'; speed.onchange?.();
@@ -70,10 +73,10 @@ export async function exportRange(api, start, end, opt, onStatus = () => {}) {
   try {
     await new Promise((res) => {
       const loop = () => {
-        const t = api.globalTime();
+        const tm = api.globalTime();
         drawFrame(x, api, opt, W, H);
-        onStatus(`Exporting ${Math.round(((t - start) / (end - start)) * 100)}% (${n} segment${n > 1 ? 's' : ''})`);
-        if (t >= end || !api.playing()) return res();
+        onStatus(t('Exporting {pct}% ({n} segment(s))', { pct: Math.round(((tm - start) / (end - start)) * 100), n }));
+        if (tm >= end || !api.playing()) return res();
         requestAnimationFrame(loop);
       };
       loop();
@@ -82,23 +85,28 @@ export async function exportRange(api, start, end, opt, onStatus = () => {}) {
   const blob = new Blob(chunks, { type: pick.mime.split(';')[0] });
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: exportFilename(api.ev.e.name, start, end, pick.ext) });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 6e4);
-  onStatus(`Exported ${a.download}`);
+  onStatus(t('Exported {name}', { name: a.download }));
 }
 
 /** Wire the bar buttons. api: {ev, focusCam (getters), vids, seekGlobal, globalTime, sampleAt, units, play, pause, playing}. */
 export function initExport(api) {
   const $ = (id) => document.getElementById(id);
   let inT = null, outT = null;
-  const show = () => ($('trimInfo').textContent = `in ${inT?.toFixed(1) ?? '–'}s · out ${outT?.toFixed(1) ?? '–'}s`);
+  const show = () => {
+    $('trimInfo').textContent = `in ${inT?.toFixed(1) ?? '–'}s · out ${outT?.toFixed(1) ?? '–'}s`;
+    const w = $('seekwrap'), T = api.ev?.total || 1; // scrubber trim markers
+    w.classList.toggle('has-in', inT != null); w.classList.toggle('has-out', outT != null);
+    w.style.setProperty('--in', `${((inT ?? 0) / T) * 100}%`); w.style.setProperty('--out', `${((outT ?? T) / T) * 100}%`);
+  };
   $('setIn').onclick = () => { if (api.ev) { inT = api.globalTime(); show(); } };
   $('setOut').onclick = () => { if (api.ev) { outT = api.globalTime(); show(); } };
   $('export').onclick = async () => {
     if (!api.ev) return;
     const r = clampRange(inT ?? 0, outT ?? api.ev.total, api.ev.total);
-    if (!r) return ($('trimInfo').textContent = 'Range too short');
+    if (!r) return ($('trimInfo').textContent = t('Range too short'));
     $('export').disabled = true;
     try { await exportRange(api, r.start, r.end, { hud: $('expHud').checked, focus: $('expFocus').checked }, (s) => ($('trimInfo').textContent = s)); }
-    catch (e) { $('trimInfo').textContent = 'Export failed: ' + e.message; }
+    catch (e) { $('trimInfo').textContent = t('Export failed: {msg}', { msg: e.message }); }
     $('export').disabled = false;
   };
 }
