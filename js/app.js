@@ -1,4 +1,4 @@
-import { groupFiles, tsToDate, CAMS, formatEventInfo } from './library.js';
+import { groupFiles, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
@@ -30,17 +30,45 @@ async function addFiles(list) {
     try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
-  for (const e of events) if (e.eventJson) { try { e.info = formatEventInfo(JSON.parse(await e.eventJson.text())); } catch { /* bad json: ignore */ } }
+  for (const e of events) if (e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); } catch { /* bad json: ignore */ } }
+  filter.category = ''; filter.type = '';
   renderEvents();
   updateCryptUi();
-  if (events.length) openEvent(events[0]);
+  if (events.length) openEvent(visibleEvents()[0] ?? events[0]);
 }
+
+const filter = { category: '', type: '' };
+const visibleEvents = () => filterEvents(events, filter);
+
+function renderFilters() {
+  const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
+  const TYPE_LABEL = { sentry: t('Sentry trigger'), saved: t('Saved by you'), honk: t('Honk'), other: t('Other') };
+  const box = $('cats'); box.innerHTML = '';
+  const byCat = countBy(events, (e) => e.category);
+  const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
+  for (const [k, label, n] of tabs) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.category === k ? ' on' : '');
+    b.setAttribute('aria-pressed', filter.category === k); b.textContent = `${label} ${n}`;
+    b.onclick = () => { filter.category = k; renderEvents(); };
+    box.append(b);
+  }
+  const sel = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
+  sel.innerHTML = ''; sel.add(new Option(t('All event types'), ''));
+  for (const k of EVENT_TYPES) if (byType[k]) sel.add(new Option(`${TYPE_LABEL[k]} (${byType[k]})`, k));
+  if (!byType[filter.type]) filter.type = '';
+  sel.value = filter.type; sel.hidden = !events.length;
+}
+document.addEventListener('langchange', () => events.length && renderEvents());
+$('evtype').onchange = (e) => { filter.type = e.target.value; renderEvents(); };
 
 const thumbUrls = [];
 function renderEvents() {
+  renderFilters();
   $('events').innerHTML = '';
   for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
-  for (const e of events) {
+  const shown = visibleEvents();
+  if (events.length && !shown.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = t('No events match this filter.'); $('events').append(p); }
+  for (const e of shown) {
     const d = document.createElement('div'); d.className = 'ev'; d.tabIndex = 0; d.setAttribute('role', 'listitem');
     const first = tsToDate(e.segments[0].ts), nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
     d.innerHTML = `<b></b><span class="when">${first.toLocaleString()} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;

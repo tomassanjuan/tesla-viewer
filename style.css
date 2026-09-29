@@ -222,3 +222,11 @@ canvas{background:transparent}
 .blur-btn:hover{border-color:var(--accent)}
 .blur-btn:focus-visible{outline:none;box-shadow:var(--ring)}
 @media(max-width:800px){#map{height:auto;aspect-ratio:2/1;max-height:200px}}
+
+.cats{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0}
+.cats:empty{display:none}
+.cat{font:inherit;font-size:12px;color:var(--mut);background:none;padding:0 var(--s3);min-height:28px;border:1px solid var(--border);border-radius:var(--r-pill);cursor:pointer}
+.cat:hover{border-color:var(--mut)}
+.cat.on{color:var(--fg);border-color:var(--accent);background:var(--surface-3)}
+#evtype{width:100%;margin-bottom:var(--s2)}
+@media (max-width:720px){.cat{min-height:36px}}
