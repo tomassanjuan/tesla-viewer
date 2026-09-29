@@ -89,7 +89,12 @@ export async function exportRange(api, start, end, opt, onStatus = () => {}) {
 export function initExport(api) {
   const $ = (id) => document.getElementById(id);
   let inT = null, outT = null;
-  const show = () => ($('trimInfo').textContent = `in ${inT?.toFixed(1) ?? '–'}s · out ${outT?.toFixed(1) ?? '–'}s`);
+  const show = () => {
+    $('trimInfo').textContent = `in ${inT?.toFixed(1) ?? '–'}s · out ${outT?.toFixed(1) ?? '–'}s`;
+    const w = $('seekwrap'), T = api.ev?.total || 1; // scrubber trim markers
+    w.classList.toggle('has-in', inT != null); w.classList.toggle('has-out', outT != null);
+    w.style.setProperty('--in', `${((inT ?? 0) / T) * 100}%`); w.style.setProperty('--out', `${((outT ?? T) / T) * 100}%`);
+  };
   $('setIn').onclick = () => { if (api.ev) { inT = api.globalTime(); show(); } };
   $('setOut').onclick = () => { if (api.ev) { outT = api.globalTime(); show(); } };
   $('export').onclick = async () => {
