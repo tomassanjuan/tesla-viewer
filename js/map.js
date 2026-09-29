@@ -1,4 +1,6 @@
 // Map panel: OpenStreetMap tiles by default (toggle, persisted); offline canvas track when off/offline/tile fails.
+import { t } from './i18n.js';
+const css = (v) => (typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888' : '#888');
 const TS = 256;
 
 // Web Mercator: lat/lon -> world pixel coords at zoom z (256px tiles).
@@ -90,7 +92,7 @@ export function createMap(canvas) {
     x.clearRect(0, 0, W, H);
     const pts = (points || []).filter((s) => s.lat || s.lon);
     x.font = '10px sans-serif';
-    if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText('No GPS', 10, 20); return; }
+    if (!pts.length) { x.fillStyle = css('--mut'); x.fillText(t('No GPS'), 10, 20); return; }
     const ci = Math.max(0, pts.indexOf(cur)), me = pts[ci], b = bounds(pts);
     const fit = { lat: (b.minLat + b.maxLat) / 2, lon: (b.minLon + b.maxLon) / 2, z: fitZoomFrac(b, W, H, 14) };
     if (!view) view = { ...fit };
@@ -114,9 +116,9 @@ export function createMap(canvas) {
       arr.forEach((p, i) => { const [a, c] = P(p); i ? x.lineTo(a, c) : x.moveTo(a, c); }); x.stroke();
     };
     line(pts.slice(ci), 'rgba(139,147,161,.55)', 2); // future, dimmed
-    line(pts.slice(0, ci + 1), '#5aa9ff', 3); // trail so far
+    line(pts.slice(0, ci + 1), css('--info'), 3); // trail so far
     const [a, c] = P(me);
-    x.save(); x.translate(a, c); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.fillStyle = '#e31937'; x.beginPath();
+    x.save(); x.translate(a, c); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.fillStyle = css('--accent'); x.beginPath();
     if (typeof me.heading === 'number' && isFinite(me.heading)) {
       x.rotate((me.heading * Math.PI) / 180); x.moveTo(0, -8); x.lineTo(5, 6); x.lineTo(0, 3); x.lineTo(-5, 6); x.closePath();
     } else x.arc(0, 0, 4, 0, 7);
