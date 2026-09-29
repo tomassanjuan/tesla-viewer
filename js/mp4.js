@@ -1,4 +1,5 @@
 import { decodeSei } from './sei.js';
+import { hvcCLengthSize, scanHevc } from './hevc.js';
 
 const ascii = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
 
@@ -25,6 +26,12 @@ export function parseClip(buffer) {
   const moov = findBox(dv, 0, dv.byteLength, 'moov');
   const mdat = findBox(dv, 0, dv.byteLength, 'mdat');
   if (!moov || !mdat) throw new Error('Not an MP4 (no moov/mdat)');
+  const mvhd = findBox(dv, moov.start, moov.end, 'mvhd');
+  let created = null;
+  if (mvhd) {
+    const secs = dv.getUint8(mvhd.start) === 1 ? Number(dv.getBigUint64(mvhd.start + 4)) : dv.getUint32(mvhd.start + 4);
+    if (secs) created = (secs - 2082844800) * 1000; // 1904 epoch -> unix ms
+  }
   const trak = findBox(dv, moov.start, moov.end, 'trak');
   const mdia = findBox(dv, trak.start, trak.end, 'mdia');
   const mdhd = findBox(dv, mdia.start, mdia.end, 'mdhd');
@@ -44,8 +51,11 @@ export function parseClip(buffer) {
   }
 
   const hevc = codec === 'hvc1' || codec === 'hev1';
-  // ponytail: HEVC SEI (different NAL header + proto) not decoded; duration only.
-  if (hevc) return { codec, hevc, width, height, duration: durations.reduce((a, b) => a + b, 0), samples: [] };
+  if (hevc) {
+    const hvcC = findBox(dv, entry + 8 + 78, Math.min(entry + dv.getUint32(entry), stsd.end), 'hvcC');
+    const r = scanHevc(dv, u8, mdat, hvcC ? hvcCLengthSize(u8, hvcC.start) : 4, durations);
+    return { codec, hevc, width, height, created, duration: durations.reduce((a, b) => a + b, 0) || r.duration, samples: r.samples };
+  }
   const samples = [];
   let cursor = mdat.start, pending = null, frame = 0, t = 0;
   while (cursor + 5 <= mdat.end) {
@@ -59,7 +69,7 @@ export function parseClip(buffer) {
     }
     cursor += len;
   }
-  return { codec, hevc, width, height, duration: t, samples };
+  return { codec, hevc, width, height, created, duration: t, samples };
 }
 
 export function isMp4(u8) {
