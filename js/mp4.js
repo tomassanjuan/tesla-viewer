@@ -43,6 +43,9 @@ export function parseClip(buffer) {
     for (let j = 0; j < c; j++) durations.push(d / timescale);
   }
 
+  const hevc = codec === 'hvc1' || codec === 'hev1';
+  // ponytail: HEVC SEI (different NAL header + proto) not decoded; duration only.
+  if (hevc) return { codec, hevc, width, height, duration: durations.reduce((a, b) => a + b, 0), samples: [] };
   const samples = [];
   let cursor = mdat.start, pending = null, frame = 0, t = 0;
   while (cursor + 5 <= mdat.end) {
@@ -56,7 +59,7 @@ export function parseClip(buffer) {
     }
     cursor += len;
   }
-  return { codec, width, height, duration: t, samples };
+  return { codec, hevc, width, height, duration: t, samples };
 }
 
 export function isMp4(u8) {

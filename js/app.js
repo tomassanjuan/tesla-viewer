@@ -51,14 +51,14 @@ async function openEvent(e) {
   const cams = CAMS.filter((c) => e.segments.some((s) => s.cams[c]));
   const segs = e.segments.map((s) => ({ ...s, dur: 0, start: 0 }));
   const samples = [];
-  let blocked = 0, t0 = 0;
+  let blocked = 0, t0 = 0, hevc = false;
   for (const s of segs) {
     s.start = t0;
     const f = s.cams.front ?? Object.values(s.cams)[0];
     if (encrypted.has(f) && !decrypted.has(f)) { blocked++; s.dur = 60; t0 += 60; continue; }
     try {
       const c = parseClip(await resolve(f).arrayBuffer());
-      s.dur = c.duration;
+      s.dur = c.duration; hevc ||= c.hevc;
       for (const m of c.samples) samples.push({ ...m, t: m.t + t0 });
     } catch { s.dur = await probeDuration(resolve(f)); }
     t0 += s.dur;
@@ -69,6 +69,7 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
+  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet' : '';
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
 }

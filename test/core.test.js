@@ -24,10 +24,10 @@ function seiNal(payload) {
 const box = (type, ...kids) => { const body = Buffer.concat(kids.map((k) => Buffer.from(k))); const h = Buffer.alloc(8); h.writeUInt32BE(body.length + 8); h.write(type, 4); return Buffer.concat([h, body]); };
 const u32 = (...v) => { const b = Buffer.alloc(4 * v.length); v.forEach((x, i) => b.writeUInt32BE(x, i * 4)); return b; };
 
-function makeMp4() {
+function makeMp4(codec = 'avc1') {
   const nals = [seiNal(seiPayload()), [0x65, 1, 2, 3], [0x41, 9, 9], [0x41, 9, 9]];
   const mdatBody = Buffer.concat(nals.map((n) => Buffer.concat([u32(n.length), Buffer.from(n)])));
-  const entry = Buffer.alloc(8 + 78); entry.write('avc1', 4); entry.writeUInt32BE(entry.length, 0);
+  const entry = Buffer.alloc(8 + 78); entry.write(codec, 4); entry.writeUInt32BE(entry.length, 0);
   entry.writeUInt16BE(1280, 8 + 24); entry.writeUInt16BE(960, 8 + 26);
   const stsd = box('stsd', u32(0, 1), entry);
   const stts = box('stts', u32(0, 1, 3, 1000));
@@ -53,6 +53,12 @@ test('parseClip returns per-frame telemetry and timing', () => {
   assert.equal(c.width, 1280); assert.equal(c.height, 960);
   assert.ok(Math.abs(c.duration - 0.1) < 1e-9);
   assert.equal(c.samples.length, 1); assert.equal(c.samples[0].speedMps, 12.5);
+});
+
+test('parseClip flags HEVC without throwing or decoding telemetry', () => {
+  const b = makeMp4('hvc1'); const c = parseClip(b.buffer.slice(b.byteOffset, b.byteOffset + b.length));
+  assert.equal(c.hevc, true); assert.equal(c.codec, 'hvc1'); assert.equal(c.samples.length, 0);
+  assert.ok(Math.abs(c.duration - 0.1) < 1e-9);
 });
 
 test('groupFiles builds events and sorted segments', () => {
