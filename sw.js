@@ -1,8 +1,8 @@
 // Cache-first app shell. Bump VERSION on any shipped change to invalidate.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE = `tesla-viewer-${VERSION}`;
 const SHELL = ['./', 'index.html', 'style.css', 'icon.svg', 'manifest.webmanifest',
-  'js/app.js', 'js/blur.js', 'js/decrypt-ui.js', 'js/export.js', 'js/hevc.js', 'js/i18n.js', 'js/insights.js', 'js/library.js', 'js/locales/de.js', 'js/locales/en.js', 'js/locales/es.js', 'js/locales/fr.js', 'js/locales/it.js', 'js/locales/ja.js', 'js/locales/nl.js', 'js/locales/pl.js', 'js/locales/pt.js', 'js/locales/zh.js', 'js/map.js', 'js/md5.js', 'js/mp4.js', 'js/protobuf.js', 'js/pwa.js', 'js/sei.js', 'js/tesla-crypto.js', 'js/ui.js'];
+  'js/app.js', 'js/blur.js', 'js/decrypt-ui.js', 'js/export.js', 'js/hevc.js', 'js/i18n.js', 'js/insights.js', 'js/library.js', 'js/locales/de.js', 'js/locales/en.js', 'js/locales/es.js', 'js/locales/fr.js', 'js/locales/it.js', 'js/locales/ja.js', 'js/locales/nl.js', 'js/locales/pl.js', 'js/locales/pt.js', 'js/locales/zh.js', 'js/map.js', 'js/md5.js', 'js/mp4.js', 'js/protobuf.js', 'js/perf.js', 'js/pwa.js', 'js/sei.js', 'js/telemetry-worker.js', 'js/tesla-crypto.js', 'js/ui.js'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

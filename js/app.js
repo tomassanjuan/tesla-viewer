@@ -8,6 +8,7 @@ import { createMap } from './map.js';
 import { t } from './i18n.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
+import { due, pickDriftFix, shouldPlay, initPerf } from './perf.js';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = (id) => document.getElementById(id);
@@ -59,6 +60,20 @@ function renderEvents() {
   }
 }
 
+// ---------- clip parsing (worker, main-thread fallback) ----------
+let worker, jobs = new Map(), jobId = 0;
+function parseOffThread(blob) {
+  if (typeof Worker === 'undefined') return blob.arrayBuffer().then(parseClip);
+  try {
+    if (!worker) {
+      worker = new Worker(new URL('./telemetry-worker.js', import.meta.url), { type: 'module' });
+      worker.onmessage = ({ data }) => { const j = jobs.get(data.id); jobs.delete(data.id); data.error ? j.rej(new Error(data.error)) : j.res(data.clip); };
+      worker.onerror = () => { worker = null; for (const j of jobs.values()) j.rej(new Error('worker failed')); jobs.clear(); };
+    }
+    return new Promise((res, rej) => { const id = ++jobId; jobs.set(id, { res, rej }); worker.postMessage({ id, blob }); });
+  } catch { return blob.arrayBuffer().then(parseClip); }
+}
+
 // ---------- event / player ----------
 const vids = {};          // cam -> <video>
 let segIdx = 0, playing = false, wantPlay = false;
@@ -69,19 +84,21 @@ async function openEvent(e) {
   const cams = CAMS.filter((c) => e.segments.some((s) => s.cams[c]));
   const segs = e.segments.map((s) => ({ ...s, dur: 0, start: 0 }));
   const samples = [];
-  let blocked = 0, t0 = 0, hevc = false;
+  let blocked = 0, t0 = 0, hevc = false, codec = '';
   for (const s of segs) {
     s.start = t0;
     const f = s.cams.front ?? Object.values(s.cams)[0];
     if (encrypted.has(f) && !decrypted.has(f)) { blocked++; s.dur = 60; t0 += 60; continue; }
     try {
-      const c = parseClip(await resolve(f).arrayBuffer());
-      s.dur = c.duration; hevc ||= c.hevc;
+      const c = await parseOffThread(resolve(f));
+      s.dur = c.duration; hevc ||= c.hevc; codec ||= c.codec;
       for (const m of c.samples) samples.push({ ...m, t: m.t + t0 });
     } catch { s.dur = await probeDuration(resolve(f)); }
     t0 += s.dur;
   }
-  ev = { e, cams, segs, samples, total: t0 };
+  const geo = samples.filter((m) => m.lat || m.lon);
+  let maxKmh = 1; for (const m of samples) maxKmh = Math.max(maxKmh, m.speedMps * 3.6);
+  ev = { e, cams, segs, samples, total: t0, geo, maxKmh, codec };
   focusCam = cams.includes('front') ? 'front' : cams[0];
   buildGrid();
   $('empty').hidden = true;
@@ -110,8 +127,8 @@ function buildGrid() {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
     d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
-    d.onclick = () => { focusCam = c; applyLayout(); };
-    d.onkeydown = (k) => { if (k.key === 'Enter') { focusCam = c; applyLayout(); } };
+    d.onclick = () => { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); };
+    d.onkeydown = (k) => { if (k.key === 'Enter') { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); } };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
@@ -130,7 +147,7 @@ function buildGridTemplate() {
   g.style.gridTemplateRows = `repeat(${Math.ceil(n / cols)},1fr)`;
 }
 
-const master = () => vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0];
+const master = () => (lowLoad && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
 async function loadSeg(i, at) {
   segIdx = i;
@@ -146,21 +163,30 @@ async function loadSeg(i, at) {
   if (wantPlay) playAll();
 }
 
-function playAll() { playing = true; $('play').classList.add('is-playing'); for (const v of Object.values(vids)) v.src && v.play().catch(() => {}); requestAnimationFrame(tick); }
+let lowLoad = false, lastUi = 0, lastDrift = 0;
+const UI_HZ = 12, DRIFT_MS = 500;
+const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (playing && shouldPlay(c, focusCam, lowLoad)) v.play().catch(() => {}); else v.pause(); } };
+function playAll() { playing = true; $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
 function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
 function stop() { wantPlay = false; if (ev) pauseAll(); }
 
+// the master must keep playing, so in low-load mode it is the focused camera
 function globalTime() { const m = master(); return ev.segs[segIdx].start + (m?.currentTime ?? 0); }
 
 async function tick() {
   if (!ev || !playing) return;
   const m = master(), s = ev.segs[segIdx];
-  for (const v of Object.values(vids)) if (v !== m && v.src && Math.abs(v.currentTime - m.currentTime) > 0.15) v.currentTime = m.currentTime;
+  const now = performance.now();
+  if (!lowLoad && now - lastDrift > DRIFT_MS) {
+    lastDrift = now;
+    const fix = pickDriftFix(Object.entries(vids).filter(([, v]) => v !== m && v.src).map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
+    if (fix) vids[fix].currentTime = m.currentTime;
+  }
   if (m.ended || m.currentTime >= s.dur - 0.03) {
     if (segIdx + 1 < ev.segs.length) { wantPlay = true; await loadSeg(segIdx + 1, 0); }
     else pauseAll();
   }
-  updateUi();
+  if (due(now, lastUi, UI_HZ)) { lastUi = now; updateUi(); }
   if (playing) requestAnimationFrame(tick);
 }
 
@@ -201,14 +227,14 @@ function updateUi() {
       (m.autopilot ? `<div class="h-ap">${AUTOPILOT[m.autopilot]}</div>` : '') +
       `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
   }
-  drawGraph(tm); drawMap(tm);
+  drawGraph(t); drawMap(t);
 }
 
-function drawGraph(tm = 0) {
+function drawGraph(t = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
   if (!ev?.samples.length) { x.fillStyle = css('--mut'); x.fillText('No telemetry in these clips', 10, 20); return; }
-  const max = Math.max(1, ...ev.samples.map((s) => s.speedMps * 3.6));
+  const max = ev.maxKmh;
   x.strokeStyle = css('--info'); x.lineWidth = 2; x.beginPath();
   ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
   x.stroke();
@@ -217,7 +243,7 @@ function drawGraph(tm = 0) {
 }
 
 function drawMap(t) {
-  map.update(ev?.samples.filter((s) => s.lat || s.lon) ?? [], sampleAt(t));
+  map.update(ev?.geo ?? [], sampleAt(t));
 }
 
 // ---------- encryption ----------
@@ -269,3 +295,4 @@ initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (
 initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
 initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });
+initPerf({ vids, codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) { const m = master(); for (const v of Object.values(vids)) if (v.src && v !== m) v.currentTime = m.currentTime; syncPlayState(); } } });
