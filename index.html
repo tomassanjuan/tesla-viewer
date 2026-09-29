@@ -99,6 +99,10 @@
         <label class="sel"><span>View</span><select id="layout" aria-label="Layout"><option value="auto">Grid</option><option value="focus">Focus</option></select></label>
         <label class="sel"><span>Units</span><select id="units" aria-label="Speed units"><option value="kmh">km/h</option><option value="mph">mph</option></select></label>
       </div>
+      <div class="grp" id="gapgrp" hidden role="group" aria-label="Gaps between clips">
+        <button id="gapSkip" class="btn" type="button" aria-pressed="true" title="Jump over gaps between clips">Skip gaps</button>
+        <button id="gapThrough" class="btn" type="button" aria-pressed="false" title="Play the gaps in real time">Play through gaps</button>
+      </div>
       <div class="grp trimgrp">
         <button id="setIn" class="btn" type="button" title="Set trim start"><svg class="ic"><use href="#i-in"/></svg>In</button>
         <button id="setOut" class="btn" type="button" title="Set trim end"><svg class="ic"><use href="#i-out"/></svg>Out</button>

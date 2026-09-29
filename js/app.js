@@ -145,6 +145,7 @@ function parseOffThread(blob) {
 // ---------- event / player ----------
 const vids = {};          // cam -> <video>
 let segIdx = 0, playing = false, wantPlay = false;
+let gapMode = 'skip', gapT = null, gapLast = 0; // 'skip' | 'through'; gapT = virtual global time while inside a gap
 
 async function openEvent(e) {
   for (const x of events) x._el?.classList.toggle('on', x === e);
@@ -154,7 +155,7 @@ async function openEvent(e) {
   const samples = [];
   let blocked = 0, t0 = 0, hevc = false, withTel = 0, codec = '', firstErr = '';
   for (const s of segs) {
-    s.start = t0;
+    s.start = t0; s.wall = tsToDate(s.ts).getTime();
     const order = [...CAMS.filter((c) => s.cams[c]), ...Object.keys(s.cams).filter((c) => !CAMS.includes(c))];
     if (order.every((c) => encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c]))) { blocked++; s.dur = 60; t0 += 60; continue; }
     let dur = null;
@@ -164,16 +165,19 @@ async function openEvent(e) {
       try {
         const p = await parseOffThread(resolve(f));
         codec ||= p.codec; dur ??= p.duration; hevc ||= p.hevc;
-        if (p.samples.length) { for (const m of p.samples) samples.push({ ...m, t: m.t + t0 }); withTel++; s.telCam = c; break; }
+        if (p.samples.length) { for (const m of p.samples) samples.push({ ...m, t: m.t + t0, _l: m.t, _s: s }); withTel++; s.telCam = c; break; }
       } catch (err) { s.err = `${c}: ${err.message}`; firstErr ||= `${s.ts} ${s.err}`; }
     }
     s.dur = dur ?? await probeDuration(resolve(s.cams[order.find((c) => !(encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c])))]));
     t0 += s.dur;
   }
+  let pe = null;
+  for (const s of segs) { s.gapBefore = pe == null ? 0 : Math.max(0, (s.wall - pe) / 1000); pe = s.wall + s.dur * 1000; if (s.gapBefore < GAP_MIN_S) s.gapBefore = 0; }
   const diag = { withTelemetry: withTel, total: segs.length, codec, firstError: firstErr };
   const geo = samples.filter((m) => m.lat || m.lon);
   let maxKmh = 1; for (const m of samples) maxKmh = Math.max(maxKmh, m.speedMps * 3.6);
   ev = { e, cams, segs, samples, total: t0, geo, maxKmh, codec, diag };
+  gapT = null; layoutGaps();
   focusCam = cams.includes('front') ? 'front' : cams[0];
   buildGrid();
   $('empty').hidden = true;
@@ -185,6 +189,38 @@ async function openEvent(e) {
   console.info('telemetry', diag);
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
+}
+
+const GAP_MIN_S = 5;
+const fmtGap = (s) => (s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 90 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`);
+const hhmm = (ms) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+// Recompute segment offsets (gaps take time only in 'through' mode), shift telemetry to match, and mark gaps on the seek bar.
+function layoutGaps() {
+  let t = 0;
+  for (const s of ev.segs) { if (gapMode === 'through') t += s.gapBefore; s.start = t; t += s.dur; }
+  ev.total = t;
+  for (const m of ev.samples) m.t = m._l + m._s.start;
+  $('seekwrap').querySelectorAll('.gap').forEach((n) => n.remove());
+  ev.segs.forEach((s) => {
+    if (!s.gapBefore) return;
+    const i = document.createElement('i'); i.className = 'gap'; i.setAttribute('aria-hidden', 'true');
+    const at = gapMode === 'through' ? s.start - s.gapBefore : s.start;
+    i.style.left = `${(at / t) * 100}%`; i.style.width = gapMode === 'through' ? `${(s.gapBefore / t) * 100}%` : '';
+    i.title = `Gap ${fmtGap(s.gapBefore)} (${hhmm(s.wall - s.gapBefore * 1000)} to ${hhmm(s.wall)})`;
+    $('seekwrap').append(i);
+  });
+  const has = ev.segs.some((s) => s.gapBefore);
+  $('gapgrp').hidden = !has;
+  $('gapSkip').setAttribute('aria-pressed', gapMode === 'skip'); $('gapThrough').setAttribute('aria-pressed', gapMode === 'through');
+}
+
+function setGapMode(m) {
+  if (!ev || m === gapMode) return;
+  const at = gapT == null ? master()?.currentTime ?? 0 : 0;
+  gapMode = m; gapT = null; layoutGaps();
+  drawGraph(); insightsRefresh.forEach((f) => f());
+  seekGlobal(ev.segs[segIdx].start + at);
 }
 
 function probeDuration(blob) {
@@ -259,20 +295,33 @@ function pauseAll() { playing = false; $('play').classList.remove('is-playing');
 function stop() { wantPlay = false; if (ev) pauseAll(); }
 
 // the master must keep playing, so in low-load mode it is the focused camera
-function globalTime() { const m = master(); return ev.segs[segIdx].start + (m?.currentTime ?? 0); }
+function globalTime() { if (gapT != null) return gapT; const m = master(); return ev.segs[segIdx].start + (m?.currentTime ?? 0); }
 
 async function tick() {
   if (!ev || !playing) return;
   const m = master(), s = ev.segs[segIdx];
   const now = performance.now();
+  if (gapT != null) { // inside a gap ('through' mode): advance a virtual clock, then start the next clip
+    gapT += ((now - gapLast) / 1000) * +$('speed').value; gapLast = now;
+    const nx = ev.segs[segIdx + 1];
+    if (gapT >= nx.start) { gapT = null; $('status').textContent = ''; wantPlay = true; await loadSeg(segIdx + 1, 0); }
+    if (due(now, lastUi, UI_HZ)) { lastUi = now; updateUi(); }
+    if (playing) requestAnimationFrame(tick);
+    return;
+  }
   if (!solo() && now - lastDrift > DRIFT_MS) {
     lastDrift = now;
     const fix = pickDriftFix(Object.entries(vids).filter(([, v]) => v !== m && v.src).map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
     if (fix) vids[fix].currentTime = m.currentTime;
   }
   if (m.ended || m.currentTime >= s.dur - 0.03) {
-    if (segIdx + 1 < ev.segs.length) { wantPlay = true; await loadSeg(segIdx + 1, 0); }
-    else pauseAll();
+    const nx = ev.segs[segIdx + 1];
+    if (!nx) pauseAll();
+    else if (gapMode === 'through' && nx.gapBefore) {
+      gapT = s.start + s.dur; gapLast = now;
+      for (const v of Object.values(vids)) v.pause();
+      $('status').textContent = `No recording: ${fmtGap(nx.gapBefore)} gap (${hhmm(nx.wall - nx.gapBefore * 1000)} to ${hhmm(nx.wall)})`;
+    } else { wantPlay = true; await loadSeg(segIdx + 1, 0); }
   }
   if (due(now, lastUi, UI_HZ)) { lastUi = now; updateUi(); }
   if (playing) requestAnimationFrame(tick);
@@ -280,8 +329,16 @@ async function tick() {
 
 async function seekGlobal(t) {
   t = Math.max(0, Math.min(ev.total - 0.01, t));
-  const i = ev.segs.findIndex((s) => t < s.start + s.dur);
-  const at = t - ev.segs[i].start;
+  let i = ev.segs.findIndex((s) => t < s.start + s.dur);
+  gapT = null;
+  if (i > 0 && t < ev.segs[i].start) { // landed inside a gap ('through' mode): park there, previous clip's last frame stays
+    gapT = t; gapLast = performance.now(); i--;
+    if (i !== segIdx) await loadSeg(i, ev.segs[i].dur);
+    for (const v of Object.values(vids)) if (v.src) v.currentTime = ev.segs[i].dur;
+    updateUi(); return;
+  }
+  if (i < 0) i = ev.segs.length - 1;
+  const at = Math.max(0, t - ev.segs[i].start);
   if (i !== segIdx) { wantPlay = playing; await loadSeg(i, at); }
   else for (const v of Object.values(vids)) if (v.src) v.currentTime = at;
   updateUi();
@@ -353,6 +410,8 @@ document.addEventListener('drop', async (e) => {
 
 $('play').onclick = () => { if (!ev) return; playing ? (wantPlay = false, pauseAll()) : (wantPlay = true, playAll()); };
 $('seek').oninput = (e) => ev && seekGlobal((e.target.value / 1000) * ev.total);
+$('gapSkip').onclick = () => setGapMode('skip');
+$('gapThrough').onclick = () => setGapMode('through');
 $('speed').onchange = () => { for (const v of Object.values(vids)) v.playbackRate = +$('speed').value; };
 $('layout').onchange = () => { if (!ev) return; const at = master()?.currentTime; applyLayout(); resync(at); };
 $('units').onchange = () => ev && updateUi();

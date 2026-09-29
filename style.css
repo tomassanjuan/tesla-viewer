@@ -164,6 +164,8 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .mark{position:absolute;top:50%;width:3px;height:22px;margin:-11px 0 0 -1px;background:var(--warn);border-radius:2px;z-index:1;pointer-events:none;display:none}
 .mark-in{left:var(--in)}.mark-out{left:var(--out)}
 #seekwrap.has-in .mark-in,#seekwrap.has-out .mark-out,#seekwrap.has-in .trim,#seekwrap.has-out .trim{display:block}
+.gap{position:absolute;top:50%;left:0;min-width:3px;height:14px;margin-top:-7px;background:repeating-linear-gradient(45deg,var(--warn),var(--warn) 2px,transparent 2px,transparent 4px);border-radius:2px;z-index:1;pointer-events:none;opacity:.8}
+#gapgrp .btn[aria-pressed=true]{background:var(--accent);color:#fff;border-color:var(--accent)}
 .dock-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s5)}
 .grp{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
 .grp.end{margin-left:auto}

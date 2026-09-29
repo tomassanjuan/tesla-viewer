@@ -14,15 +14,19 @@ const p2 = (n) => String(n).padStart(2, '0');
 const dayKey = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 const dur = (n) => { const m = n; return m >= 60 ? `${Math.floor(m / 60)} h ${p2(m % 60)} min` : `${m} min`; };
 
-/** Split sorted segments where start - (prevStart + 60 s) > gapS. */
+export const REGULAR_GAP_MAX_S = 900; // a repeating gap up to this long (e.g. a clip every 5 min) does not split a group
+
+/** Split sorted segments where start - (prevStart + 60 s) > gapS, except gaps that repeat with a consistent length
+ *  (>= 2 within +-25 % of their median, median <= REGULAR_GAP_MAX_S): those keep the clips in one group. */
 function splitByGap(segs, gapS) {
+  const ts = segs.map((s) => tsToDate(s.ts).getTime());
+  const gaps = ts.map((t, i) => (i ? (t - ts[i - 1]) / 1000 - SEG_S : 0));
+  const big = gaps.filter((g) => g > gapS).sort((a, b) => a - b);
+  const med = big[big.length >> 1];
+  const regular = (g) => g > gapS && med <= REGULAR_GAP_MAX_S && Math.abs(g - med) <= med * 0.25;
+  const keep = big.filter(regular).length >= 2;
   const runs = [];
-  let prev = null;
-  for (const s of segs) {
-    const t = tsToDate(s.ts).getTime();
-    if (!prev || (t - prev) / 1000 - SEG_S > gapS) runs.push([]);
-    runs[runs.length - 1].push(s); prev = t;
-  }
+  segs.forEach((s, i) => { if (!i || (gaps[i] > gapS && !(keep && regular(gaps[i])))) runs.push([]); runs[runs.length - 1].push(s); });
   return runs;
 }
 
