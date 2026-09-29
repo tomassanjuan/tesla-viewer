@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { latLonToTile, fitZoom, tilesForView, bounds } from '../js/map.js';
+import { latLonToTile, fitZoom, fitZoomFrac, unproject, project, tilesForView, bounds } from '../js/map.js';
 
 test('latLonToTile known values', () => {
   assert.deepEqual(latLonToTile(0, 0, 1), { x: 1, y: 1, z: 1 });
@@ -21,4 +21,16 @@ test('tilesForView covers the view', () => {
 });
 test('bounds', () => {
   assert.deepEqual(bounds([{ lat: 1, lon: 2 }, { lat: 3, lon: -4 }]), { minLat: 1, maxLat: 3, minLon: -4, maxLon: 2 });
+});
+test('unproject inverts project', () => {
+  const [a, o] = unproject(...project(37.5, -122.3, 12), 12);
+  assert.ok(Math.abs(a - 37.5) < 1e-9 && Math.abs(o + 122.3) < 1e-9);
+});
+test('fitZoomFrac is fractional, monotonic, >= integer fit, clamped', () => {
+  const b = { minLat: 37.0, maxLat: 37.003, minLon: -122.0, maxLon: -121.997 };
+  const f = fitZoomFrac(b, 240, 120, 10), i = fitZoom(b, 240, 120, 10);
+  assert.ok(f >= i && f < i + 1);
+  assert.ok(fitZoomFrac(b, 480, 240, 10) > f);
+  assert.equal(fitZoomFrac({ minLat: 1, maxLat: 1, minLon: 1, maxLon: 1 }, 240, 120), 18);
+  assert.equal(fitZoomFrac({ minLat: -80, maxLat: 80, minLon: -179, maxLon: 179 }, 240, 120), 0);
 });
