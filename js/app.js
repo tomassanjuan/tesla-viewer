@@ -251,8 +251,10 @@ function buildGrid() {
 }
 
 // click a camera to enlarge it; click the enlarged camera to return to the grid
+const PHONE = globalThis.matchMedia?.('(max-width:860px),(orientation:landscape) and (max-height:520px) and (max-width:1000px)'); // keep in sync with style.css
 function toggleFocus(c) {
   const sel = $('layout'), at = master()?.currentTime;
+  if (PHONE?.matches && sel.value === 'auto' && c !== focusCam) { focusCam = c; applyLayout(); resync(at); return; } // phone strip: tap a thumbnail to make it the big camera
   focusCam = c;
   sel.value = sel.value === 'focus' ? 'auto' : 'focus';
   applyLayout(); resync(at); // hidden tiles are paused in focus layout; re-sync them on any change
