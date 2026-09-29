@@ -258,16 +258,23 @@ function updateUi() {
   drawGraph(t); drawMap(t);
 }
 
+// The speed trace is static per event/theme: render it once to an offscreen canvas, then only blit + draw the cursor.
+let trace = null;
+addEventListener('themechange', () => { trace = null; });
 function drawGraph(t = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
   if (!ev?.samples.length) { x.fillStyle = css('--mut'); x.fillText('No telemetry in these clips', 10, 20); return; }
-  const max = ev.maxKmh;
-  x.strokeStyle = css('--info'); x.lineWidth = 2; x.beginPath();
-  ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
-  x.stroke();
+  if (!trace || trace.ev !== ev || trace.width !== W || trace.height !== H) {
+    const max = ev.maxKmh, cv = Object.assign(document.createElement('canvas'), { width: W, height: H }), g = cv.getContext('2d');
+    g.strokeStyle = css('--info'); g.lineWidth = 2; g.beginPath();
+    ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? g.lineTo(px, py) : g.moveTo(px, py); });
+    g.stroke();
+    g.fillStyle = css('--mut'); g.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
+    trace = { ev, width: W, height: H, cv };
+  }
+  x.drawImage(trace.cv, 0, 0);
   x.lineWidth = 1; x.strokeStyle = css('--accent'); x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
-  x.fillStyle = css('--mut'); x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
 }
 
 function drawMap(t) {
