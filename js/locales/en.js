@@ -1,0 +1,28 @@
+// Source of truth: every key is the English UI string (also matched against static index.html text).
+// {name} = interpolation. Other locales mirror these keys; missing ones fall back to English.
+const KEYS = [
+  'Free, on-device dashcam viewer. Nothing is uploaded.',
+  'Drop TeslaCam folder or clips here', 'Folder', 'Files',
+  'Encrypted clips (2026.20+)', 'experimental',
+  'Decryption runs locally. The per-file key comes from Tesla, tied to your account.',
+  'Tesla bearer token', 'from dashcam.tesla.com', 'Fetch keys & decrypt', 'or paste key JSON', 'Decrypt with pasted keys',
+  'Load a TeslaCam folder to begin',
+  'Play/pause', 'Step back one frame', 'Step forward one frame', 'Seek', 'Playback speed', 'Layout', 'Grid', 'Focus', 'Speed units',
+  'Export telemetry as CSV', 'Set in', 'Set out', 'Export', 'HUD', 'Focused cam',
+  'Telemetry graph', 'GPS track map', 'Click to enlarge',
+  'Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server.',
+  'Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)',
+  'Keyboard shortcuts', 'Space', 'Play / pause', 'Step frame back / forward', 'Seek 5 s', 'Toggle this help', 'Esc', 'Close', 'Language',
+  'Front', 'Back', 'Left', 'Right', 'L pillar', 'R pillar',
+  '{n} min-clips',
+  'HEVC clip: video plays if your browser supports it; telemetry not decoded yet',
+  '{n} segment(s) are encrypted; open "Encrypted clips" to decrypt.',
+  'GEAR', 'STEER', 'THROTTLE', 'BRAKE', 'ON', 'Self-driving', 'Autosteer',
+  'No telemetry in these clips', 'speed, max {n} km/h',
+  '{n} of {total} encrypted clips still locked.', 'No encrypted clips loaded.',
+  'Decrypted {n}…', 'Decrypt failed: {msg}', 'Decrypted {ok}, no key for {missing}.', 'Requesting keys…',
+  '{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.', 'Bad JSON: {msg}',
+  'No GPS', 'Range too short', 'Export failed: {msg}', 'Exporting {pct}% ({n} segment(s))', 'Exported {name}',
+  'MediaRecorder has no mp4/webm support in this browser', 'in {a}s · out {b}s',
+];
+export default Object.fromEntries(KEYS.map((k) => [k, k]));

@@ -1,6 +1,5 @@
 // Telemetry graph: DPR-aware canvas, axes, AP bands, throttle/brake strips, playhead, hover + click/drag seek.
-let t = (k) => k; // i18n is optional so this module also loads where ./i18n.js is absent
-import('./i18n.js').then((m) => { t = m.t; }).catch(() => {});
+import { t } from './i18n.js';
 
 // ---------- pure helpers ----------
 /** "Nice" tick values covering [min,max] with roughly `count` ticks. */
@@ -59,8 +58,8 @@ export function createGraph(canvas, opts = {}) {
   const tip = document.createElement('div'); tip.className = 'gr-tip'; tip.hidden = true; wrap.appendChild(tip);
   if (!document.getElementById('gr-style')) {
     const st = document.createElement('style'); st.id = 'gr-style';
-    st.textContent = '.gr-wrap{position:relative;flex:1;min-width:0;height:120px}.gr-wrap canvas{width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}' +
-      '.gr-tip{position:absolute;top:4px;left:0;pointer-events:none;background:var(--panel,#181b22);color:var(--fg,#e8eaed);border:1px solid var(--border,var(--b,#2a2f3a));border-radius:6px;padding:3px 7px;font:11px system-ui,sans-serif;white-space:nowrap;z-index:2}.gr-tip[hidden]{display:none}';
+    st.textContent = '.gr-wrap{position:relative;flex:1;min-width:0;height:150px}.gr-wrap>canvas{width:100%!important;height:100%!important;aspect-ratio:auto!important;display:block;touch-action:none;cursor:crosshair}' +
+      '.gr-tip{position:absolute;top:4px;left:0;pointer-events:none;background:var(--surface,#181b22);color:var(--fg,#e8eaed);border:1px solid var(--border,var(--b,#2a2f3a));border-radius:6px;padding:3px 7px;font:11px system-ui,sans-serif;white-space:nowrap;z-index:2}.gr-tip[hidden]{display:none}';
     document.head.appendChild(st);
   }
   const css = (n, d) => getComputedStyle(canvas).getPropertyValue(n).trim() || d;
@@ -155,7 +154,7 @@ export function createGraph(canvas, opts = {}) {
   const onUnits = () => { units = sel.value; sched(); };
   const on = [['pointermove', onMove], ['pointerdown', onDown], ['pointerup', onUp], ['pointercancel', onUp], ['pointerleave', onLeave]];
   for (const [n, f] of on) canvas.addEventListener(n, f);
-  document.addEventListener('themechange', sched); sel?.addEventListener('change', onUnits);
+  addEventListener('themechange', sched); sel?.addEventListener('change', onUnits);
   const ro = new ResizeObserver(sched); ro.observe(canvas);
   sched();
   return {
@@ -164,7 +163,7 @@ export function createGraph(canvas, opts = {}) {
     destroy() {
       ro.disconnect(); cancelAnimationFrame(raf);
       for (const [n, f] of on) canvas.removeEventListener(n, f);
-      document.removeEventListener('themechange', sched); sel?.removeEventListener('change', onUnits); tip.remove();
+      removeEventListener('themechange', sched); sel?.removeEventListener('change', onUnits); tip.remove();
     },
   };
 }
