@@ -3,7 +3,8 @@ import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { createMap } from './map.js';
-import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
+import { parseHeader } from './tesla-crypto.js';
+import { initDecryptUi } from './decrypt-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -22,7 +23,7 @@ async function addFiles(list) {
   for (const { file } of items) {
     if (!/\.mp4$/i.test(file.name)) continue;
     const head = new Uint8Array(await file.slice(0, 0x2000).arrayBuffer());
-    if (isEncrypted(head)) encrypted.set(file, parseHeader(head));
+    try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
   renderEvents();
@@ -197,37 +198,8 @@ function drawMap(t) {
 }
 
 // ---------- encryption ----------
-function updateCryptUi() {
-  const n = [...encrypted.keys()].filter((f) => !decrypted.has(f)).length;
-  $('cryptCount').textContent = encrypted.size ? `${n} of ${encrypted.size} encrypted clips still locked.` : 'No encrypted clips loaded.';
-  if (n) $('crypt').open = true;
-}
-
-async function decryptAll(keys) {
-  let ok = 0, missing = 0;
-  for (const [f, h] of encrypted) {
-    if (decrypted.has(f)) continue;
-    const key = keys[h.id];
-    if (!key) { missing++; continue; }
-    try {
-      const out = await decrypt(new Uint8Array(await f.arrayBuffer()), key);
-      decrypted.set(f, new Blob([out], { type: 'video/mp4' })); ok++;
-      $('cryptMsg').textContent = `Decrypted ${ok}…`;
-    } catch (e) { $('cryptMsg').textContent = 'Decrypt failed: ' + e.message; }
-  }
-  $('cryptMsg').textContent = `Decrypted ${ok}, no key for ${missing}.`;
-  updateCryptUi();
-  if (ok && ev) openEvent(ev.e);
-}
-
-$('fetchKeys').onclick = async () => {
-  try {
-    const hs = [...encrypted.entries()].filter(([f]) => !decrypted.has(f)).map(([, h]) => h);
-    $('cryptMsg').textContent = 'Requesting keys…';
-    await decryptAll(await fetchKeys(hs, $('token').value.trim()));
-  } catch (e) { $('cryptMsg').textContent = `${e.message}. If this is a CORS/network error, fetch keys another way and paste them as JSON.`; }
-};
-$('useKeys').onclick = () => { try { decryptAll(parseKeyJson($('keyJson').value)); } catch (e) { $('cryptMsg').textContent = 'Bad JSON: ' + e.message; } };
+const cryptUi = initDecryptUi({ encrypted, decrypted, onUnlocked: () => ev && openEvent(ev.e) });
+const updateCryptUi = () => cryptUi.update();
 
 // ---------- wiring ----------
 $('pickDir').onchange = (e) => addFiles(e.target.files);

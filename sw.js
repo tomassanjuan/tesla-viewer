@@ -1,8 +1,8 @@
 // Cache-first app shell. Bump VERSION on any shipped change to invalidate.
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `tesla-viewer-${VERSION}`;
 const SHELL = ['./', 'index.html', 'style.css', 'icon.svg', 'manifest.webmanifest',
-  'js/app.js', 'js/library.js', 'js/md5.js', 'js/mp4.js', 'js/protobuf.js', 'js/sei.js', 'js/tesla-crypto.js', 'js/pwa.js', 'js/export.js', 'js/map.js'];
+  'js/app.js', 'js/library.js', 'js/md5.js', 'js/mp4.js', 'js/protobuf.js', 'js/sei.js', 'js/tesla-crypto.js', 'js/decrypt-ui.js', 'js/pwa.js', 'js/export.js', 'js/map.js'];
 // ponytail: modules added by other features are cached at runtime on first fetch; add them to SHELL for offline-first-load.
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
