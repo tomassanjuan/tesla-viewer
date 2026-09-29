@@ -153,8 +153,8 @@ function buildGrid() {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
     d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
-    d.onclick = () => { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); };
-    d.onkeydown = (k) => { if (k.key === 'Enter') { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); } };
+    d.onclick = () => setFocus(c);
+    d.onkeydown = (k) => { if (k.key === 'Enter') setFocus(c); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
@@ -175,7 +175,8 @@ function buildGridTemplate() {
   g.style.gridTemplateRows = `repeat(${layout.rows},1fr)`;
 }
 
-const master = () => (lowLoad && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
+const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
+const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
 async function loadSeg(i, at) {
   segIdx = i;
@@ -191,9 +192,12 @@ async function loadSeg(i, at) {
   if (wantPlay) playAll();
 }
 
-let lowLoad = false, lastUi = 0, lastDrift = 0;
+let lowLoad = false, lastUi = 0, lastDrift = 0, lastHud = '';
 const UI_HZ = 12, DRIFT_MS = 500;
-const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (playing && shouldPlay(c, focusCam, lowLoad)) v.play().catch(() => {}); else v.pause(); } };
+// bring paused/hidden tiles back to the master's time and apply play state (after solo mode changes)
+function resync(at = master()?.currentTime) { if (at != null) for (const v of Object.values(vids)) if (v.src && Math.abs(v.currentTime - at) > 0.05) v.currentTime = at; syncPlayState(); }
+function setFocus(c) { const at = master()?.currentTime; focusCam = c; applyLayout(); resync(at); }
+const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
 function playAll() { playing = true; $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
 function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
 function stop() { wantPlay = false; if (ev) pauseAll(); }
@@ -205,7 +209,7 @@ async function tick() {
   if (!ev || !playing) return;
   const m = master(), s = ev.segs[segIdx];
   const now = performance.now();
-  if (!lowLoad && now - lastDrift > DRIFT_MS) {
+  if (!solo() && now - lastDrift > DRIFT_MS) {
     lastDrift = now;
     const fix = pickDriftFix(Object.entries(vids).filter(([, v]) => v !== m && v.src).map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
     if (fix) vids[fix].currentTime = m.currentTime;
@@ -245,7 +249,7 @@ function updateUi() {
     const kmh = m.speedMps * 3.6, mph = m.speedMps * 2.23694, u = $('units').value;
     const cl = (v) => Math.max(-1, Math.min(1, v));
     const arrow = (dir, on) => `<svg viewBox="0 0 24 24" class="${on ? 'on' : ''}"><path d="${dir ? 'M4 7l9 5-9 5z M13 7l7 5-7 5z' : 'M20 7l-9 5 9 5z M11 7l-7 5 7 5z'}" fill="currentColor"/></svg>`;
-    $('hud').innerHTML =
+    const html =
       `<div class="h-speed"><b>${Math.round(u === 'kmh' ? kmh : mph)}</b><small>${u === 'kmh' ? 'km/h' : 'mph'}</small></div>` +
       `<div class="h-gear" title="Gear">${['P', 'R', 'N', 'D'].map((g) => `<i class="${GEAR[m.gear] === g ? 'on' : ''}">${g}</i>`).join('')}</div>` +
       `<div class="h-wheel"><svg viewBox="0 0 48 48" style="transform:rotate(${m.steering}deg)"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M4.5 22h13.5M30 22h13.5M24 28v16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg><b>${m.steering.toFixed(0)}°</b></div>` +
@@ -254,20 +258,29 @@ function updateUi() {
       `<div class="h-turn">${arrow(0, m.blinkerLeft)}${arrow(1, m.blinkerRight)}</div>` +
       (m.autopilot ? `<div class="h-ap">${AUTOPILOT[m.autopilot]}</div>` : '') +
       `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
+    if (html !== lastHud) { lastHud = html; $('hud').innerHTML = html; }
   }
   drawGraph(t); drawMap(t);
 }
 
+let graphBase = null; // speed line + label, rendered once per event/size/theme; only the cursor is drawn per update
+addEventListener('themechange', () => { graphBase = null; });
 function drawGraph(t = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
   if (!ev?.samples.length) { x.fillStyle = css('--mut'); x.fillText('No telemetry in these clips', 10, 20); return; }
   const max = ev.maxKmh;
-  x.strokeStyle = css('--info'); x.lineWidth = 2; x.beginPath();
-  ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
-  x.stroke();
-  x.lineWidth = 1; x.strokeStyle = css('--accent'); x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
-  x.fillStyle = css('--mut'); x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
+  if (!graphBase || graphBase.ev !== ev || graphBase.cv.width !== W || graphBase.cv.height !== H) {
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    g.strokeStyle = css('--info'); g.lineWidth = 2; g.beginPath();
+    ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? g.lineTo(px, py) : g.moveTo(px, py); });
+    g.stroke();
+    g.fillStyle = css('--mut'); g.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
+    graphBase = { ev, cv, accent: css('--accent') };
+  }
+  x.drawImage(graphBase.cv, 0, 0);
+  x.lineWidth = 1; x.strokeStyle = graphBase.accent; x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
 }
 
 function drawMap(t) {
@@ -303,7 +316,7 @@ document.addEventListener('drop', async (e) => {
 $('play').onclick = () => { if (!ev) return; playing ? (wantPlay = false, pauseAll()) : (wantPlay = true, playAll()); };
 $('seek').oninput = (e) => ev && seekGlobal((e.target.value / 1000) * ev.total);
 $('speed').onchange = () => { for (const v of Object.values(vids)) v.playbackRate = +$('speed').value; };
-$('layout').onchange = () => ev && applyLayout();
+$('layout').onchange = () => { if (!ev) return; const at = master()?.currentTime; applyLayout(); resync(at); };
 $('units').onchange = () => ev && updateUi();
 $('stepF').onclick = () => { if (ev) { pauseAll(); seekGlobal(globalTime() + 1 / 36); } };
 $('stepB').onclick = () => { if (ev) { pauseAll(); seekGlobal(globalTime() - 1 / 36); } };
@@ -323,4 +336,4 @@ initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (
 initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
 initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });
-initPerf({ vids, codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) { const m = master(); for (const v of Object.values(vids)) if (v.src && v !== m) v.currentTime = m.currentTime; syncPlayState(); } } });
+initPerf({ vids, codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) resync(); } });
