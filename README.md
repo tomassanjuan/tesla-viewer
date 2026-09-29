@@ -10,7 +10,7 @@ Free, on-device clone of tesclip.com: view TeslaCam / Sentry clips in synced mul
 - Encrypted clips (fw 2026.20+), **experimental**: local AES decrypt; keys via your Tesla token or pasted JSON. See [ROADMAP.md](ROADMAP.md) for caveats.
 
 ## Development
-`npm test` runs the unit tests (MP4/SEI parsing, MD5, grouping, decrypt round-trip). Vanilla ES modules, no build.
+`npm test` runs the unit tests (MP4/SEI parsing, MD5, grouping, decrypt round-trip). `npm run test:e2e` runs the Playwright browser tests (needs `npm ci && npx playwright install chromium`; set `CHROMIUM_PATH` to use an existing Chromium). GitHub Actions runs both on every PR and push to main. Vanilla ES modules, no build.
 
 See [ROADMAP.md](ROADMAP.md) for status and next steps. Format credits: [teslamotors/dashcam](https://github.com/teslamotors/dashcam), [XGxF3/tesla-dashcam-decrypt](https://github.com/XGxF3/tesla-dashcam-decrypt).
 
