@@ -8,3 +8,5 @@ package.json
 wrangler.jsonc
 .assetsignore
 .gitignore
+
+scripts
