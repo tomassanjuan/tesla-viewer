@@ -135,7 +135,7 @@ export function init(state) {
   document.head.append(Object.assign(document.createElement('style'), { textContent: CSS }));
   const dock = document.getElementById('extras-dock') ?? document.body;
   const stage = document.getElementById('extras-stage') ?? document.body;
-  const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'blur-btn', textContent: 'Blur' });
+  const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'blur-btn', textContent: 'Edit blur' });
   const panel = Object.assign(document.createElement('div'), { className: 'blur-panel', hidden: true });
   panel.innerHTML = `<label class="blur-row"><input type="checkbox" checked> Privacy blur</label><div class="blur-list"></div>`;
   const tog = panel.querySelector('input'); ui = { list: panel.querySelector('.blur-list') };
