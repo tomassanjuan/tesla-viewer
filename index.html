@@ -4,7 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tesla Viewer</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0f1115">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,6 +16,7 @@
   <div id="drop"><strong>Drop TeslaCam folder or clips here</strong>
     <div class="row"><label class="btn">Folder<input id="pickDir" type="file" webkitdirectory hidden></label>
     <label class="btn">Files<input id="pickFiles" type="file" accept=".mp4" multiple hidden></label></div></div>
+  <p id="status" class="muted" role="status"></p>
   <div id="events"></div>
   <details id="crypt"><summary>Encrypted clips (2026.20+) <em>experimental</em></summary>
     <p class="muted">Decryption runs locally. The per-file key comes from Tesla, tied to your account.</p>
@@ -29,17 +32,24 @@
   <div id="stage"><div id="grid"></div><div id="empty">Load a TeslaCam folder to begin</div>
     <div id="hud" hidden></div></div>
   <div id="bar">
-    <button id="play" title="Space">▶</button>
-    <button id="stepB" title=",">◀|</button><button id="stepF" title=".">|▶</button>
-    <input id="seek" type="range" min="0" max="1000" value="0">
+    <button id="play" title="Space" aria-label="Play/pause">▶</button>
+    <button id="stepB" title="," aria-label="Step back one frame">◀|</button><button id="stepF" title="." aria-label="Step forward one frame">|▶</button>
+    <input id="seek" aria-label="Seek" type="range" min="0" max="1000" value="0">
     <span id="time">0:00 / 0:00</span>
-    <select id="speed"><option>0.1</option><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>4</option><option>10</option></select>
-    <select id="layout"><option value="auto">Grid</option><option value="focus">Focus</option></select>
-    <select id="units"><option value="kmh">km/h</option><option value="mph">mph</option></select>
-    <button id="csv">CSV</button>
+    <select id="speed" aria-label="Playback speed"><option>0.1</option><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>4</option><option>10</option></select>
+    <select id="layout" aria-label="Layout"><option value="auto">Grid</option><option value="focus">Focus</option></select>
+    <select id="units" aria-label="Speed units"><option value="kmh">km/h</option><option value="mph">mph</option></select>
+    <button id="csv" aria-label="Export telemetry as CSV">CSV</button>
+    <button id="setIn">Set in</button><button id="setOut">Set out</button><button id="export">Export</button>
+    <label><input type="checkbox" id="expHud" checked>HUD</label><label><input type="checkbox" id="expFocus">Focused cam</label>
+    <small id="trimInfo" class="muted"></small>
   </div>
-  <div id="panels"><canvas id="graph" width="700" height="120"></canvas><canvas id="map" width="240" height="120"></canvas></div>
+  <div id="panels"><canvas id="graph" role="img" aria-label="Telemetry graph" width="700" height="120"></canvas><div id="mapbox"><canvas id="map" role="img" aria-label="GPS track map" width="240" height="120" title="Click to enlarge"></canvas>
+    <label id="mapopt" title="Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server."><input type="checkbox" id="tiles"> Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)</label></div></div>
 </main>
+<div id="help" role="dialog" aria-label="Keyboard shortcuts" hidden><h2>Keyboard shortcuts</h2>
+<dl><dt>Space</dt><dd>Play / pause</dd><dt>, .</dt><dd>Step frame back / forward</dd><dt>← →</dt><dd>Seek 5 s</dd><dt>?</dt><dd>Toggle this help</dd><dt>Esc</dt><dd>Close</dd></dl></div>
 <script type="module" src="js/app.js"></script>
+<script type="module" src="js/pwa.js"></script>
 </body>
 </html>

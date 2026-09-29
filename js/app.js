@@ -1,12 +1,16 @@
 import { groupFiles, tsToDate, CAMS } from './library.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
+import { initExport } from './export.js';
+import { createMap } from './map.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repeater: 'Right', left_pillar: 'L pillar', right_pillar: 'R pillar' };
 
+const map = createMap($('map'));
+$('tiles').onchange = (e) => map.setTiles(e.target.checked);
 let events = [], ev = null, focusCam = 'front';
 const decrypted = new Map();     // original File -> decrypted Blob
 const encrypted = new Map();     // original File -> parsed header
@@ -47,14 +51,14 @@ async function openEvent(e) {
   const cams = CAMS.filter((c) => e.segments.some((s) => s.cams[c]));
   const segs = e.segments.map((s) => ({ ...s, dur: 0, start: 0 }));
   const samples = [];
-  let blocked = 0, t0 = 0;
+  let blocked = 0, t0 = 0, hevc = false;
   for (const s of segs) {
     s.start = t0;
     const f = s.cams.front ?? Object.values(s.cams)[0];
     if (encrypted.has(f) && !decrypted.has(f)) { blocked++; s.dur = 60; t0 += 60; continue; }
     try {
       const c = parseClip(await resolve(f).arrayBuffer());
-      s.dur = c.duration;
+      s.dur = c.duration; hevc ||= c.hevc;
       for (const m of c.samples) samples.push({ ...m, t: m.t + t0 });
     } catch { s.dur = await probeDuration(resolve(f)); }
     t0 += s.dur;
@@ -65,6 +69,7 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
+  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet' : '';
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
 }
@@ -188,18 +193,7 @@ function drawGraph(t = 0) {
 }
 
 function drawMap(t) {
-  const c = $('map'), x = c.getContext('2d'), W = c.width, H = c.height;
-  x.clearRect(0, 0, W, H);
-  const pts = ev?.samples.filter((s) => s.lat || s.lon) ?? [];
-  if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText('No GPS', 10, 20); return; }
-  const lat0 = pts[0].lat, k = Math.cos((lat0 * Math.PI) / 180);
-  const X = pts.map((p) => p.lon * k), Y = pts.map((p) => -p.lat);
-  const minX = Math.min(...X), maxX = Math.max(...X), minY = Math.min(...Y), maxY = Math.max(...Y);
-  const sc = Math.min((W - 20) / (maxX - minX || 1e-6), (H - 20) / (maxY - minY || 1e-6));
-  const P = (i) => [10 + (X[i] - minX) * sc, 10 + (Y[i] - minY) * sc];
-  x.strokeStyle = '#5aa9ff'; x.beginPath(); pts.forEach((_, i) => { const [a, b] = P(i); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.stroke();
-  const cur = sampleAt(t); const i = Math.max(0, pts.indexOf(cur));
-  const [a, b] = P(i); x.fillStyle = '#e31937'; x.beginPath(); x.arc(a, b, 4, 0, 7); x.fill();
+  map.update(ev?.samples.filter((s) => s.lat || s.lon) ?? [], sampleAt(t));
 }
 
 // ---------- encryption ----------
@@ -273,3 +267,5 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
+initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
+  units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });
