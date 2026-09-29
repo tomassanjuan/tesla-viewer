@@ -1,4 +1,5 @@
 // Map panel: offline canvas track by default; optional OpenStreetMap tiles (opt-in).
+import { t } from './i18n.js';
 const TS = 256;
 const css = (v) => (typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888' : '#888');
 

@@ -5,6 +5,7 @@ import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
+import { t } from './i18n.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
 
@@ -200,10 +201,10 @@ function updateUi() {
       (m.autopilot ? `<div class="h-ap">${AUTOPILOT[m.autopilot]}</div>` : '') +
       `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
   }
-  drawGraph(t); drawMap(t);
+  drawGraph(tm); drawMap(tm);
 }
 
-function drawGraph(t = 0) {
+function drawGraph(tm = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
   if (!ev?.samples.length) { x.fillStyle = css('--mut'); x.fillText('No telemetry in these clips', 10, 20); return; }
