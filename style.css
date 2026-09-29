@@ -41,10 +41,10 @@ h1,h2{margin:0}
 .side-off #app{grid-template-columns:0 minmax(0,1fr)}
 
 /* ---------- buttons & fields ---------- */
-.btn,.ibtn,select{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.btn,.ibtn{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
 .btn{display:inline-flex;align-items:center;gap:var(--s2);padding:0 var(--s3);min-height:36px;white-space:nowrap;font-weight:500}
 .ibtn{display:inline-grid;place-items:center;width:40px;height:40px;padding:0;border-radius:var(--r-pill)}
-.btn:hover,.ibtn:hover,select:hover{background:var(--surface-3);border-color:var(--mut)}
+.btn:hover,.ibtn:hover{background:var(--surface-3);border-color:var(--mut)}
 .btn:active,.ibtn:active{transform:scale(.96)}
 .btn:disabled{opacity:.5;cursor:progress}
 .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent)}
@@ -54,7 +54,6 @@ h1,h2{margin:0}
 .ibtn.play .ic{width:22px;height:22px}
 #play .i-pause,#play.is-playing .i-play{display:none}
 #play.is-playing .i-pause{display:inline}
-select{padding:0 var(--s2);min-height:36px}
 label{display:block}
 input[type=password],textarea{width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px;font:inherit;margin-top:var(--s1)}
 input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0 6px 0 0;vertical-align:-3px}
@@ -208,7 +207,8 @@ canvas{background:transparent}
   .h-g,.h-wheel b{display:none}
   #bar{padding:var(--s2) var(--s3) var(--s3)}
   .ibtn{width:44px;height:44px}.ibtn.play{width:52px;height:52px}
-  .btn,select{min-height:44px}
+  .btn{min-height:44px}
+  .seg button{min-height:44px}
   .chip{min-height:36px}
   .dock-row{gap:var(--s2) var(--s3)}
   .grp.end{margin-left:0}
@@ -239,3 +239,33 @@ canvas{background:transparent}
 .ev .tele{flex:none;white-space:nowrap;font-size:10px;font-weight:600;padding:0 5px;line-height:16px;border-radius:var(--r-pill);color:var(--accent);border:1px solid var(--accent)}
 .evgroup{font-size:12px;font-weight:600;color:var(--mut);margin:var(--s3) 0 var(--s2)}
 .evgroup-list{display:grid;gap:var(--s2)}
+
+/* ---------- segmented button groups (replace selects) ---------- */
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-pill)}
+.seg button{font:inherit;font-size:12px;font-weight:500;color:var(--mut);background:none;border:0;border-radius:var(--r-pill);padding:0 var(--s3);min-height:30px;cursor:pointer;text-transform:none;letter-spacing:0}
+.seg button:hover{color:var(--fg)}
+.seg button.on{background:var(--accent);color:var(--on-accent)}
+.seg button:focus-visible{outline:none;box-shadow:var(--ring)}
+#lang button{padding:0 var(--s2);min-width:34px}
+
+/* ---------- dashboard view: telemetry only, no cameras ---------- */
+#app.dash #grid{display:none}
+#app.dash #stage{container-type:size;flex:1.1}
+#app.dash #hud{--d:clamp(56px,16cqh,140px);inset:0;transform:none;width:auto;max-width:none;flex-wrap:wrap;justify-content:center;align-content:center;gap:var(--s4) calc(var(--d) * .6);padding:var(--s4);background:none;border:0;box-shadow:none}
+#app.dash .h-speed b{font-size:calc(var(--d) * 2.4)}
+#app.dash .h-speed small{font-size:calc(var(--d) * .28)}
+#app.dash #hud .k{font-size:calc(var(--d) * .16)}
+#app.dash .h-gear i{width:calc(var(--d) * .5);height:calc(var(--d) * .5);font-size:calc(var(--d) * .26)}
+#app.dash .h-wheel svg{width:var(--d);height:var(--d)}
+#app.dash .h-wheel b{display:block;font-size:calc(var(--d) * .26)}
+#app.dash .h-bar i{width:calc(var(--d) * .22);height:var(--d)}
+#app.dash .h-turn svg{width:calc(var(--d) * .5);height:calc(var(--d) * .5)}
+#app.dash .h-ap{font-size:calc(var(--d) * .24);padding:calc(var(--d) * .06) calc(var(--d) * .22)}
+#app.dash .h-g{display:flex}
+#app.dash .h-g i{width:var(--d);height:var(--d)}
+#app.dash #panels{flex:1;min-height:0;flex-direction:row}
+#app.dash .graph-panel{align-self:stretch}
+#app.dash #graph{flex:1 1 0;min-height:0;height:100%;aspect-ratio:auto}
+#app.dash #mapbox{width:min(46%,560px);display:flex;flex-direction:column}
+#app.dash #map{flex:1 1 0;min-height:0;height:0;max-height:none;aspect-ratio:auto}
+@media (max-width:860px){#app.dash #stage{height:min(80vw,60dvh)}#app.dash #panels{flex-direction:column}#app.dash #graph{height:140px;flex:none}#app.dash #mapbox{width:100%}#app.dash #map{height:200px;flex:none}}

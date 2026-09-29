@@ -94,4 +94,7 @@ export default {
   "Day": "日期",
   "City": "城市",
   "Unknown": "未知",
+  "Dashboard": "仪表盘",
+  "None": "无",
+  "Telemetry only, no cameras": "仅遥测，无摄像头",
 };

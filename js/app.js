@@ -7,6 +7,7 @@ import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
 import { createGraph } from './graph.js';
 import { t } from './i18n.js';
+import { seg } from './seg.js';
 import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
@@ -145,6 +146,7 @@ function parseOffThread(blob) {
 }
 
 // ---------- event / player ----------
+for (const id of ['groupby', 'speed', 'layout', 'units']) seg($(id));
 const vids = {};          // cam -> <video>
 let segIdx = 0, playing = false, wantPlay = false;
 let gapMode = 'skip', gapT = null, gapLast = 0; // 'skip' | 'through'; gapT = virtual global time while inside a gap
@@ -178,6 +180,7 @@ async function openEvent(e) {
   const diag = { withTelemetry: withTel, total: segs.length, codec, firstError: firstErr };
   const geo = samples.filter((m) => m.lat || m.lon);
   let maxKmh = 1; for (const m of samples) maxKmh = Math.max(maxKmh, m.speedMps * 3.6);
+  dashT = 0;
   ev = { e, cams, segs, samples, total: t0, geo, maxKmh, codec, diag };
   gapT = null; layoutGaps();
   focusCam = cams.includes('front') ? 'front' : cams[0];
@@ -219,10 +222,10 @@ function layoutGaps() {
 
 function setGapMode(m) {
   if (!ev || m === gapMode) return;
-  const at = gapT == null ? master()?.currentTime ?? 0 : 0;
+  const t = globalTime(), k = Math.max(0, ev.segs.findLastIndex((x) => x.start <= t)), at = Math.min(Math.max(0, t - ev.segs[k].start), ev.segs[k].dur);
   gapMode = m; gapT = null; layoutGaps();
   drawGraph(); insightsRefresh.forEach((f) => f());
-  seekGlobal(ev.segs[segIdx].start + at);
+  seekGlobal(ev.segs[k].start + at);
 }
 
 function probeDuration(blob) {
@@ -257,7 +260,7 @@ function toggleFocus(c) {
 
 function applyLayout() {
   const g = $('grid'), focus = $('layout').value === 'focus';
-  g.classList.toggle('focus', focus);
+  g.classList.toggle('focus', focus); $('app').classList.toggle('dash', dash());
   if (focus) { g.style.gridTemplateColumns = '1fr'; g.style.gridTemplateRows = '1fr'; }
   else buildGridTemplate();
   for (const d of g.children) { const p = focus ? null : layout.place[d._cam]; d.style.gridColumn = p ? p.col : ''; d.style.gridRow = p ? p.row : ''; }
@@ -270,6 +273,8 @@ function buildGridTemplate() {
   g.style.gridTemplateRows = `repeat(${layout.rows},1fr)`;
 }
 
+const dash = () => $('layout').value === 'dash'; // telemetry-only view: videos stay paused, a virtual clock drives the timeline
+let dashT = 0, dashLast = 0;
 const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
 const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
@@ -291,18 +296,24 @@ let lowLoad = false, lastUi = 0, lastDrift = 0, lastHud = '';
 const UI_HZ = 12, DRIFT_MS = 500;
 // bring paused/hidden tiles back to the master's time and apply play state (after solo mode changes)
 function resync(at = master()?.currentTime) { if (at != null) for (const v of Object.values(vids)) if (v.src && Math.abs(v.currentTime - at) > 0.05) v.currentTime = at; syncPlayState(); }
-const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
-function playAll() { playing = true; $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
+const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (!dash() && playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
+function playAll() { playing = true; dashLast = performance.now(); $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
 function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
 function stop() { wantPlay = false; if (ev) pauseAll(); }
 
 // the master must keep playing, so in low-load mode it is the focused camera
-function globalTime() { if (gapT != null) return gapT; const m = master(); return ev.segs[segIdx].start + (m?.currentTime ?? 0); }
+const videoTime = () => ev.segs[segIdx].start + (master()?.currentTime ?? 0);
+function globalTime() { return dash() ? dashT : gapT != null ? gapT : videoTime(); }
 
 async function tick() {
   if (!ev || !playing) return;
-  const m = master(), s = ev.segs[segIdx];
   const now = performance.now();
+  if (dash()) {
+    dashT = Math.min(ev.total, dashT + ((now - dashLast) / 1000) * +$('speed').value); dashLast = now;
+    if (dashT >= ev.total) { updateUi(); return pauseAll(); }
+    if (due(now, lastUi, UI_HZ)) { lastUi = now; updateUi(); }
+    return requestAnimationFrame(tick);
+  }
   if (gapT != null) { // inside a gap ('through' mode): advance a virtual clock, then start the next clip
     gapT += ((now - gapLast) / 1000) * +$('speed').value; gapLast = now;
     const nx = ev.segs[segIdx + 1];
@@ -311,6 +322,7 @@ async function tick() {
     if (playing) requestAnimationFrame(tick);
     return;
   }
+  const m = master(), s = ev.segs[segIdx];
   if (!solo() && now - lastDrift > DRIFT_MS) {
     lastDrift = now;
     const fix = pickDriftFix(Object.entries(vids).filter(([, v]) => v !== m && v.src).map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
@@ -331,6 +343,7 @@ async function tick() {
 
 async function seekGlobal(t) {
   t = Math.max(0, Math.min(ev.total - 0.01, t));
+  if (dash()) { dashT = t; dashLast = performance.now(); gapT = null; return updateUi(); }
   let i = ev.segs.findIndex((s) => t < s.start + s.dur);
   gapT = null;
   if (i > 0 && t < ev.segs[i].start) { // landed inside a gap ('through' mode): park there, previous clip's last frame stays
@@ -415,7 +428,15 @@ $('seek').oninput = (e) => ev && seekGlobal((e.target.value / 1000) * ev.total);
 $('gapSkip').onclick = () => setGapMode('skip');
 $('gapThrough').onclick = () => setGapMode('through');
 $('speed').onchange = () => { for (const v of Object.values(vids)) v.playbackRate = +$('speed').value; };
-$('layout').onchange = () => { if (!ev) return; const at = master()?.currentTime; applyLayout(); resync(at); };
+let wasDash = false;
+$('layout').onchange = async () => {
+  if (!ev) return;
+  const d = dash();
+  if (d && !wasDash) { dashT = videoTime(); dashLast = performance.now(); }
+  if (d) { wasDash = true; applyLayout(); syncPlayState(); updateUi(); return; }
+  if (wasDash) { wasDash = false; applyLayout(); await seekGlobal(dashT); resync(); return; }
+  const at = master()?.currentTime; applyLayout(); resync(at);
+};
 $('units').onchange = () => ev && updateUi();
 $('stepF').onclick = () => { if (ev) { pauseAll(); seekGlobal(globalTime() + 1 / 36); } };
 $('stepB').onclick = () => { if (ev) { pauseAll(); seekGlobal(globalTime() - 1 / 36); } };
