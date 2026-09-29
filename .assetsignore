@@ -10,3 +10,7 @@ wrangler.jsonc
 .gitignore
 
 scripts
+package-lock.json
+playwright.config.js
+test-results
+playwright-report
