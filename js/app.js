@@ -1,4 +1,5 @@
-import { groupFiles, tsToDate, CAMS } from './library.js';
+import { groupFiles, tsToDate, CAMS, formatEventInfo } from './library.js';
+import { init as initInsights } from './insights.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
@@ -27,18 +28,29 @@ async function addFiles(list) {
     try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
+  for (const e of events) if (e.eventJson) { try { e.info = formatEventInfo(JSON.parse(await e.eventJson.text())); } catch { /* bad json: ignore */ } }
   renderEvents();
   updateCryptUi();
   if (events.length) openEvent(events[0]);
 }
 
+const thumbUrls = [];
 function renderEvents() {
   $('events').innerHTML = '';
+  for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
   for (const e of events) {
     const d = document.createElement('div'); d.className = 'ev'; d.tabIndex = 0; d.setAttribute('role', 'listitem');
     const first = tsToDate(e.segments[0].ts), nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
     d.innerHTML = `<b></b><span class="when">${first.toLocaleString()} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
     d.firstChild.textContent = e.name;
+    const info = [e.info?.reason, e.info?.place].filter(Boolean).join(' · ');
+    if (info) { const s = document.createElement('small'); s.textContent = info; d.append(s); }
+    if (e.thumb) {
+      const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
+      const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
+      im.style.cssText = 'display:block;width:100%;max-width:160px;border-radius:4px;margin-top:4px';
+      d.prepend(im);
+    }
     d.onclick = () => openEvent(e);
     d.onkeydown = (k) => { if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); openEvent(e); } };
     e._el = d; $('events').append(d);
@@ -73,6 +85,7 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
+  insightsRefresh.forEach((f) => f());
   $('status').textContent = hevc && !samples.length ? 'HEVC clip: video plays if your browser supports it; no telemetry found' : '';
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
   await loadSeg(0, 0);
@@ -249,5 +262,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
+const insightsRefresh = [];
+initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (f) => insightsRefresh.push(f) });
 initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });

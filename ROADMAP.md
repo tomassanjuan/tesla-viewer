@@ -24,6 +24,9 @@ Goal: a free, fully on-device alternative to tesclip.com. Static site, no backen
 - [x] **P6 Map tiles** (opt-in, off by default to stay fully offline), reverse-geocode-free location display.
 - [~] **P7 Polish**: done: PWA/offline install (manifest, sw.js cache-first, icon), HEVC clips: hvcC length size, prefix/suffix SEI (js/hevc.js), tolerant protobuf + `fieldsSeen` diagnostics (synthetic-fixture tested only; no real HEVC clips yet, dashcam#14), `?` shortcut help, aria-labels. Open: verify HEVC on real clips, i18n, license-plate blur.
 - [ ] **P8 Verify encryption** against real clips; CORS-free key flow (browser extension or paste flow) if Tesla blocks cross-origin.
+- [x] **P9 Insights**: `event.json` (reason, place) and `thumb.png` shown on event cards; js/insights.js computes trip summary
+      (GPS distance with jitter filter, duration, max/avg speed, autopilot %, hard braking/accel, sharp turns, AP engage/disengage)
+      in a units-aware panel, plus clickable timeline ticks that seek. Thresholds are heuristics (`DEFAULTS`), not calibrated.
 
 ## Non-goals
 Uploading video anywhere, accounts, ads, watermarks.
