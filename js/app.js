@@ -6,6 +6,7 @@ import { initExport } from './export.js';
 import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
 import { t } from './i18n.js';
+import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
 
@@ -103,9 +104,6 @@ function probeDuration(blob) {
 
 function buildGrid() {
   const g = $('grid'); g.innerHTML = ''; for (const k in vids) delete vids[k];
-  const n = ev.cams.length, cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
-  g.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  g.style.gridTemplateRows = `repeat(${Math.ceil(n / cols)},1fr)`;
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
@@ -122,12 +120,14 @@ function applyLayout() {
   g.classList.toggle('focus', focus);
   if (focus) { g.style.gridTemplateColumns = '1fr'; g.style.gridTemplateRows = '1fr'; }
   else buildGridTemplate();
+  for (const d of g.children) { const p = focus ? null : layout.place[d._cam]; d.style.gridColumn = p ? p.col : ''; d.style.gridRow = p ? p.row : ''; }
   for (const d of g.children) d.classList.toggle('main', d._cam === focusCam);
 }
+let layout = { place: {} };
 function buildGridTemplate() {
-  const n = ev.cams.length, cols = n <= 1 ? 1 : n <= 4 ? 2 : 3, g = $('grid');
-  g.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  g.style.gridTemplateRows = `repeat(${Math.ceil(n / cols)},1fr)`;
+  layout = spatialLayout(ev.cams); const g = $('grid');
+  g.style.gridTemplateColumns = `repeat(${layout.cols},1fr)`;
+  g.style.gridTemplateRows = `repeat(${layout.rows},1fr)`;
 }
 
 const master = () => vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0];
