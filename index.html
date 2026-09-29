@@ -41,7 +41,8 @@
     <label><input type="checkbox" id="expHud" checked>HUD</label><label><input type="checkbox" id="expFocus">Focused cam</label>
     <small id="trimInfo" class="muted"></small>
   </div>
-  <div id="panels"><canvas id="graph" width="700" height="120"></canvas><canvas id="map" width="240" height="120"></canvas></div>
+  <div id="panels"><canvas id="graph" width="700" height="120"></canvas><div id="mapbox"><canvas id="map" width="240" height="120" title="Click to enlarge"></canvas>
+    <label id="mapopt" title="Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server."><input type="checkbox" id="tiles"> Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)</label></div></div>
 </main>
 <script type="module" src="js/app.js"></script>
 </body>
