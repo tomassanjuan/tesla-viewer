@@ -1,6 +1,6 @@
 import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
-import { parseClip, hasSei } from './mp4.js';
+import { parseClip, probeSei } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { init as initBlur } from './blur.js';
@@ -74,6 +74,7 @@ $('groupby').onchange = (e) => { groupBy = e.target.value; renderEvents(); };
 const thumbUrls = [];
 function renderEvents() {
   renderFilters();
+  teleObs?.disconnect();
   $('events').innerHTML = '';
   for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
   const shown = visibleEvents();
@@ -81,14 +82,14 @@ function renderEvents() {
   const renderOne = (e, into) => {
     const d = document.createElement('div'); d.className = 'ev'; d.tabIndex = 0; d.setAttribute('role', 'listitem');
     const nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
-    d.innerHTML = `<b></b><span class="when">${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
-    d.firstChild.textContent = e.name;
+    d.innerHTML = `<div class="ttl"><b></b></div><span class="when">${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
+    d.querySelector('b').textContent = e.name;
     const info = [e.info?.reason, e.info?.place].filter(Boolean).join(' · ');
     if (info) { const s = document.createElement('small'); s.textContent = info; d.append(s); }
     if (e.thumb) {
       const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
       const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
-      im.style.cssText = 'display:block;width:100%;max-width:160px;border-radius:4px;margin-top:4px';
+      im.style.cssText = 'display:block;grid-column:1/-1;width:100%;max-width:160px;border-radius:4px;margin-bottom:4px';
       d.prepend(im);
     }
     d.onclick = () => openEvent(e);
@@ -116,14 +117,15 @@ function watchTelemetry(e, el) {
   el._ev = e; teleObs ? teleObs.observe(el) : probeTelemetry(e, el);
 }
 function showTelemetry(e, el) {
-  if (!e.telemetry || el.querySelector('.tele')) return;
-  const s = Object.assign(document.createElement('span'), { className: 'tele', textContent: t('Telemetry'), title: t('Telemetry available') });
-  el.querySelector('.badge').before(s);
+  if (e.telemetry !== true || el.querySelector('.tele')) return;
+  const s = Object.assign(document.createElement('span'), { className: 'tele', textContent: '∿', title: t('Telemetry available') });
+  s.setAttribute('role', 'img'); s.setAttribute('aria-label', t('Telemetry available'));
+  el.querySelector('.ttl').append(s);
 }
 async function probeTelemetry(e, el) {
   const f = e.segments[0].cams.front ?? Object.values(e.segments[0].cams)[0];
   if (e.telemetry === undefined && f && !(encrypted.has(f) && !decrypted.has(f))) {
-    try { e.telemetry = hasSei(await resolve(f).slice(0, 262144).arrayBuffer()) === true; } catch { e.telemetry = false; }
+    try { e.telemetry = await probeSei(resolve(f)); } catch { e.telemetry = null; }
   }
   showTelemetry(e, el);
 }
