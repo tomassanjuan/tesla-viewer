@@ -1,12 +1,15 @@
 import { groupFiles, tsToDate, CAMS } from './library.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
+import { createMap } from './map.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repeater: 'Right', left_pillar: 'L pillar', right_pillar: 'R pillar' };
 
+const map = createMap($('map'));
+$('tiles').onchange = (e) => map.setTiles(e.target.checked);
 let events = [], ev = null, focusCam = 'front';
 const decrypted = new Map();     // original File -> decrypted Blob
 const encrypted = new Map();     // original File -> parsed header
@@ -188,18 +191,7 @@ function drawGraph(t = 0) {
 }
 
 function drawMap(t) {
-  const c = $('map'), x = c.getContext('2d'), W = c.width, H = c.height;
-  x.clearRect(0, 0, W, H);
-  const pts = ev?.samples.filter((s) => s.lat || s.lon) ?? [];
-  if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText('No GPS', 10, 20); return; }
-  const lat0 = pts[0].lat, k = Math.cos((lat0 * Math.PI) / 180);
-  const X = pts.map((p) => p.lon * k), Y = pts.map((p) => -p.lat);
-  const minX = Math.min(...X), maxX = Math.max(...X), minY = Math.min(...Y), maxY = Math.max(...Y);
-  const sc = Math.min((W - 20) / (maxX - minX || 1e-6), (H - 20) / (maxY - minY || 1e-6));
-  const P = (i) => [10 + (X[i] - minX) * sc, 10 + (Y[i] - minY) * sc];
-  x.strokeStyle = '#5aa9ff'; x.beginPath(); pts.forEach((_, i) => { const [a, b] = P(i); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.stroke();
-  const cur = sampleAt(t); const i = Math.max(0, pts.indexOf(cur));
-  const [a, b] = P(i); x.fillStyle = '#e31937'; x.beginPath(); x.arc(a, b, 4, 0, 7); x.fill();
+  map.update(ev?.samples.filter((s) => s.lat || s.lon) ?? [], sampleAt(t));
 }
 
 // ---------- encryption ----------
