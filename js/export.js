@@ -1,3 +1,4 @@
+import { drawBlurs } from './blur.js';
 // Trim + export: records a canvas composite of the playing <video>s via MediaRecorder. Fully in-browser.
 // ponytail: real-time recording (export takes as long as the range); WebCodecs faster-than-realtime muxing is a later upgrade.
 
@@ -42,6 +43,7 @@ function drawFrame(x, api, opt, W, H) {
     if (!v?.videoWidth) continue;
     const k = Math.min(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k;
     x.drawImage(v, X + (w - dw) / 2, Y + (h - dh) / 2, dw, dh);
+    drawBlurs(x, c, { x: X + (w - dw) / 2, y: Y + (h - dh) / 2, w: dw, h: dh }, v, api.globalTime());
   }
   const m = opt.hud && api.sampleAt(api.globalTime());
   if (m) {
