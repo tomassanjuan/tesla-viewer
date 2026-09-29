@@ -85,4 +85,11 @@ export default {
   "Honk": "Clacson",
   "Other": "Altro",
   "No events match this filter.": "Nessun evento corrisponde a questo filtro.",
+  "Telemetry": "Telemetria",
+  "Telemetry available": "Telemetria disponibile",
+  "Group by": "Raggruppa per",
+  "No grouping": "Nessun raggruppamento",
+  "Day": "Giorno",
+  "City": "Città",
+  "Unknown": "Sconosciuta",
 };

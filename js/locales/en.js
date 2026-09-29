@@ -25,5 +25,6 @@ const KEYS = [
   'No GPS', 'Range too short', 'Export failed: {msg}', 'Exporting {pct}% ({n} segment(s))', 'Exported {name}',
   'MediaRecorder has no mp4/webm support in this browser', 'in {a}s · out {b}s',
   'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'All event types', 'Sentry trigger', 'Saved by you', 'Honk', 'Other', 'No events match this filter.',
+  'Telemetry', 'Telemetry available', 'Group by', 'No grouping', 'Day', 'City', 'Unknown',
 ];
 export default Object.fromEntries(KEYS.map((k) => [k, k]));

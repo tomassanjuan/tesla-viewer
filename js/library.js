@@ -72,13 +72,27 @@ const REASONS = {
 
 /** Parsed Tesla event.json -> { reason, place } display strings ('' when unknown). */
 export function formatEventInfo(j) {
-  if (!j || typeof j !== 'object') return { reason: '', place: '' };
+  if (!j || typeof j !== 'object') return { reason: '', place: '', city: '' };
   const r = String(j.reason ?? '');
   const reason = REASONS[r] ?? r.replace(/^user_interaction_/, '').replace(/_/g, ' ');
   const lat = +j.est_lat, lon = +j.est_lon;
   const place = [j.street, j.city].filter(Boolean).join(', ') ||
     (Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon) ? `${lat.toFixed(4)}, ${lon.toFixed(4)}` : '');
-  return { reason, place };
+  return { reason, place, city: String(j.city ?? '').trim() };
+}
+
+export const GROUPS = ['none', 'day', 'city'];
+/** Split events into [{ key, events }] by 'day' (first segment's date) or 'city' (event.json city; '' = unknown, last). 'none' = one group. */
+export function groupEvents(events, by = 'none') {
+  if (by !== 'day' && by !== 'city') return [{ key: '', events }];
+  const m = new Map();
+  for (const e of events) {
+    const k = by === 'day' ? (e.segments[0]?.ts.slice(0, 10) ?? '') : (e.city ?? '');
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(e);
+  }
+  const out = [...m].map(([key, events]) => ({ key, events }));
+  return by === 'city' ? out.sort((a, b) => !a.key - !b.key || a.key.localeCompare(b.key)) : out;
 }
 
 export function tsToDate(ts) {

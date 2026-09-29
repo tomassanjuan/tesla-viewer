@@ -85,4 +85,11 @@ export default {
   "Honk": "クラクション",
   "Other": "その他",
   "No events match this filter.": "このフィルターに一致するイベントはありません。",
+  "Telemetry": "テレメトリ",
+  "Telemetry available": "テレメトリあり",
+  "Group by": "グループ化",
+  "No grouping": "グループ化なし",
+  "Day": "日",
+  "City": "都市",
+  "Unknown": "不明",
 };
