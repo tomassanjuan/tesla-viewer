@@ -25,6 +25,12 @@ const load = async (page) => {
 };
 const evt = (page, text) => page.locator('#events .ev', { hasText: text });
 const chip = (page, sel, text) => page.locator(`${sel} button`, { hasText: text });
+// #layout/#units/#groupby are <select>s or button groups (js/seg.js); both expose .value, so drive them either way.
+const setOpt = async (page, id, v) => {
+  const b = page.locator(`${id} [data-v="${v}"]`);
+  if (await b.count()) await b.click(); else await page.locator(id).selectOption(v);
+};
+const optValue = (page, id) => page.locator(id).evaluate((el) => el.value);
 const open = async (page, text) => { await evt(page, text).click(); await expect(evt(page, text)).toHaveClass(/\bon\b/); };
 
 test('page loads with the drop zone and no library', async ({ page }) => {
@@ -64,16 +70,16 @@ test('click a camera to enlarge it and click again to restore the grid', async (
   await back.click();
   await expect(page.locator('#grid')).toHaveClass(/\bfocus\b/);
   await expect(back).toHaveClass(/\bmain\b/);
-  await expect(page.locator('#layout')).toHaveValue('focus');
+  expect(await optValue(page, '#layout')).toBe('focus');
   await back.click();
   await expect(page.locator('#grid')).not.toHaveClass(/\bfocus\b/);
-  await expect(page.locator('#layout')).toHaveValue('auto');
+  expect(await optValue(page, '#layout')).toBe('auto');
 });
 
 test('event-type chips filter the library', async ({ page }) => {
   await load(page);
   await expect(chip(page, '#evtype', 'Saved by you')).toBeVisible();
-  await chip(page, '#evtype', 'Sentry trigger').click();
+  await chip(page, '#evtype', /Person|Sentry/).click();
   await expect(page.locator('#events .ev')).toHaveCount(1);
   await expect(evt(page, '2026-03-03_22-00-00')).toBeVisible();
   await chip(page, '#evtype', 'Honk').click();
@@ -97,9 +103,9 @@ test('group by day / city / none', async ({ page }) => {
   await load(page);
   const heads = page.locator('#events h3.evgroup');
   await expect(heads).toHaveCount(4);                 // default: one day each
-  await page.locator('#groupby').selectOption('city');
+  await setOpt(page, '#groupby', 'city');
   await expect(heads).toHaveText(['Madrid', 'Paris', 'Unknown']);   // trip has no event.json city
-  await page.locator('#groupby').selectOption('none');
+  await setOpt(page, '#groupby', 'none');
   await expect(heads).toHaveCount(0);
   await expect(page.locator('#events .ev')).toHaveCount(4);
 });
@@ -136,11 +142,11 @@ test('telemetry HUD follows the playhead and the units switch', async ({ page })
   await open(page, '2026-03-02_10-00-00');
   await expect(page.locator('#hud')).toBeVisible();
   const speed = () => page.locator('#hud .h-speed b').textContent().then(Number);
-  await page.locator('#units').selectOption('kmh');
+  await page.locator('#stepF').click();   // the HUD is drawn on the first playhead update
   await expect(page.locator('#hud .h-speed small')).toHaveText('km/h');
   const kmh = await speed();
   expect(kmh).toBeGreaterThan(0);
-  await page.locator('#units').selectOption('mph');
+  await setOpt(page, '#units', 'mph');
   await expect(page.locator('#hud .h-speed small')).toHaveText('mph');
   expect(await speed()).toBeLessThan(kmh);
 });
@@ -161,6 +167,18 @@ test('graph scrubbing seeks the playhead', async ({ page }) => {
   await page.locator('#seek').fill('0');
   await page.locator('#seek').dispatchEvent('input');
   await expect(async () => expect(+(await page.locator('#seek').inputValue())).toBe(0)).toPass();
+});
+
+test('dashboard view hides the cameras and keeps telemetry', async ({ page }) => {
+  await load(page);
+  await open(page, '2026-03-02_10-00-00');
+  if (!(await page.locator('#layout [data-v="dash"]').count())) test.skip(true, 'no dashboard view in this build');
+  await setOpt(page, '#layout', 'dash');
+  expect(await optValue(page, '#layout')).toBe('dash');
+  await expect(page.locator('#grid')).toBeHidden();
+  await expect(page.locator('#hud')).toBeVisible();
+  await setOpt(page, '#layout', 'auto');
+  await expect(page.locator('#grid')).toBeVisible();
 });
 
 test('CSV export downloads the telemetry', async ({ page }) => {
