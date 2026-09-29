@@ -109,3 +109,18 @@ export function hasSei(buffer) {
   }
   return null;
 }
+
+/** Blob version of hasSei: finds mdat via top-level box headers (moov may come first and be large), then reads only its first 64 KB. */
+export async function probeSei(blob) {
+  let pos = 0;
+  for (let i = 0; i < 16 && pos + 8 <= blob.size; i++) {
+    const h = new DataView(await blob.slice(pos, pos + 16).arrayBuffer());
+    if (h.byteLength < 8) return null;
+    let size = h.getUint32(0);
+    if (ascii(h, 4) === 'mdat') return hasSei(await blob.slice(pos, pos + 65536).arrayBuffer());
+    if (size === 1 && h.byteLength >= 16) size = Number(h.getBigUint64(8));
+    if (size < 8) return null;
+    pos += size;
+  }
+  return null;
+}
