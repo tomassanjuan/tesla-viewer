@@ -79,7 +79,6 @@ export default {
   "Saved": "保存済み",
   "Sentry": "センチネル",
   "Loose clips": "単独クリップ",
-  "All event types": "すべてのイベント種別",
   "Sentry trigger": "センチネルのトリガー",
   "Saved by you": "手動で保存",
   "Honk": "クラクション",

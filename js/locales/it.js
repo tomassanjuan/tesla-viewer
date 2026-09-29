@@ -79,7 +79,6 @@ export default {
   "Saved": "Salvati",
   "Sentry": "Sentinella",
   "Loose clips": "Clip singole",
-  "All event types": "Tutti i tipi di evento",
   "Sentry trigger": "Attivazione Sentinella",
   "Saved by you": "Salvato da te",
   "Honk": "Clacson",

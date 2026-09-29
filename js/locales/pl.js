@@ -79,7 +79,6 @@ export default {
   "Saved": "Zapisane",
   "Sentry": "Sentry",
   "Loose clips": "Luźne klipy",
-  "All event types": "Wszystkie typy zdarzeń",
   "Sentry trigger": "Wyzwolenie Sentry",
   "Saved by you": "Zapisane przez Ciebie",
   "Honk": "Klakson",

@@ -54,14 +54,17 @@ function renderFilters() {
     b.onclick = () => { filter.category = k; renderEvents(); };
     box.append(b);
   }
-  const sel = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
-  sel.innerHTML = ''; sel.add(new Option(t('All event types'), ''));
-  for (const k of EVENT_TYPES) if (byType[k]) sel.add(new Option(`${TYPE_LABEL[k]} (${byType[k]})`, k));
+  const tbox = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
+  tbox.innerHTML = '';
   if (!byType[filter.type]) filter.type = '';
-  sel.value = filter.type; sel.hidden = !events.length;
+  for (const k of EVENT_TYPES) if (byType[k]) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
+    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${TYPE_LABEL[k]} ${byType[k]}`;
+    b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
+    tbox.append(b);
+  }
 }
 document.addEventListener('langchange', () => events.length && renderEvents());
-$('evtype').onchange = (e) => { filter.type = e.target.value; renderEvents(); };
 
 const thumbUrls = [];
 function renderEvents() {
@@ -153,11 +156,19 @@ function buildGrid() {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
     d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
-    d.onclick = () => { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); };
-    d.onkeydown = (k) => { if (k.key === 'Enter') { focusCam = c; applyLayout(); if (lowLoad) syncPlayState(); } };
+    d.onclick = () => toggleFocus(c);
+    d.onkeydown = (k) => { if (k.key === 'Enter') toggleFocus(c); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
+}
+
+// click a camera to enlarge it; click the enlarged camera to return to the grid
+function toggleFocus(c) {
+  const sel = $('layout');
+  focusCam = c;
+  sel.value = sel.value === 'focus' ? 'auto' : 'focus';
+  applyLayout(); if (lowLoad) syncPlayState();
 }
 
 function applyLayout() {

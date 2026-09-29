@@ -79,7 +79,6 @@ export default {
   "Saved": "Opgeslagen",
   "Sentry": "Sentry",
   "Loose clips": "Losse clips",
-  "All event types": "Alle gebeurtenistypen",
   "Sentry trigger": "Sentry-trigger",
   "Saved by you": "Door jou opgeslagen",
   "Honk": "Claxon",

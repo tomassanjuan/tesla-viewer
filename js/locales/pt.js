@@ -79,7 +79,6 @@ export default {
   "Saved": "Salvos",
   "Sentry": "Sentinela",
   "Loose clips": "Clipes soltos",
-  "All event types": "Todos os tipos de evento",
   "Sentry trigger": "Acionamento da Sentinela",
   "Saved by you": "Salvo por você",
   "Honk": "Buzina",

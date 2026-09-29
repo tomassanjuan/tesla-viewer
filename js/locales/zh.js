@@ -79,7 +79,6 @@ export default {
   "Saved": "已保存",
   "Sentry": "哨兵",
   "Loose clips": "零散片段",
-  "All event types": "所有事件类型",
   "Sentry trigger": "哨兵触发",
   "Saved by you": "手动保存",
   "Honk": "鸣笛",

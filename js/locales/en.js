@@ -24,6 +24,6 @@ const KEYS = [
   '{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.', 'Bad JSON: {msg}',
   'No GPS', 'Range too short', 'Export failed: {msg}', 'Exporting {pct}% ({n} segment(s))', 'Exported {name}',
   'MediaRecorder has no mp4/webm support in this browser', 'in {a}s · out {b}s',
-  'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'All event types', 'Sentry trigger', 'Saved by you', 'Honk', 'Other', 'No events match this filter.',
+  'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'Sentry trigger', 'Saved by you', 'Honk', 'Other', 'No events match this filter.',
 ];
 export default Object.fromEntries(KEYS.map((k) => [k, k]));

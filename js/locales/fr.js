@@ -79,7 +79,6 @@ export default {
   "Saved": "Enregistrés",
   "Sentry": "Sentinelle",
   "Loose clips": "Clips isolés",
-  "All event types": "Tous les types d'événement",
   "Sentry trigger": "Déclenchement Sentinelle",
   "Saved by you": "Enregistré par vous",
   "Honk": "Klaxon",

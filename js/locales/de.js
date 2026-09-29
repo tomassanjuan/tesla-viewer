@@ -79,7 +79,6 @@ export default {
   "Saved": "Gespeichert",
   "Sentry": "Wächter",
   "Loose clips": "Lose Clips",
-  "All event types": "Alle Ereignistypen",
   "Sentry trigger": "Wächter-Auslöser",
   "Saved by you": "Von dir gespeichert",
   "Honk": "Hupe",

@@ -79,7 +79,6 @@ export default {
   "Saved": "Guardados",
   "Sentry": "Centinela",
   "Loose clips": "Clips sueltos",
-  "All event types": "Todos los tipos de evento",
   "Sentry trigger": "Activación del centinela",
   "Saved by you": "Guardado por ti",
   "Honk": "Claxon",
