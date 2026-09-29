@@ -155,9 +155,10 @@ function buildGrid() {
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
-    d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
+    d.tabIndex = 0; d.title = d.ariaLabel = `${NAMES[c]}: ${t('Click to enlarge')}`;
     d.onclick = () => toggleFocus(c);
     d.onkeydown = (k) => { if (k.key === 'Enter') toggleFocus(c); };
+    d.ondblclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else d.requestFullscreen?.().catch(() => {}); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
@@ -326,6 +327,7 @@ $('csv').onclick = () => {
 document.addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
   if (e.code === 'Space') { e.preventDefault(); $('play').click(); }
+  else if (e.key === 'Escape' && $('layout').value === 'focus') { $('layout').value = 'auto'; applyLayout(); }
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
