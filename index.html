@@ -97,6 +97,10 @@
         <div class="sel"><span>View</span><div id="layout" class="seg" aria-label="Layout"><button type="button" data-v="auto" class="on">Grid</button><button type="button" data-v="focus">Focus</button><button type="button" data-v="dash" title="Telemetry only, no cameras">Dashboard</button></div></div>
         <div class="sel"><span>Units</span><div id="units" class="seg" aria-label="Speed units"><button type="button" data-v="kmh" class="on">km/h</button><button type="button" data-v="mph">mph</button></div></div>
       </div>
+      <div class="grp" id="gapgrp" hidden role="group" aria-label="Gaps between clips">
+        <button id="gapSkip" class="btn" type="button" aria-pressed="true" title="Jump over gaps between clips">Skip gaps</button>
+        <button id="gapThrough" class="btn" type="button" aria-pressed="false" title="Play the gaps in real time">Play through gaps</button>
+      </div>
       <div class="grp trimgrp">
         <button id="setIn" class="btn" type="button" title="Set trim start"><svg class="ic"><use href="#i-in"/></svg>In</button>
         <button id="setOut" class="btn" type="button" title="Set trim end"><svg class="ic"><use href="#i-out"/></svg>Out</button>
