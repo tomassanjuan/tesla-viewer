@@ -1,6 +1,7 @@
 import { groupFiles, tsToDate, CAMS } from './library.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
+import { updateTopbar } from './topbar.js';
 import { initExport } from './export.js';
 import { createMap } from './map.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
@@ -122,6 +123,7 @@ async function loadSeg(i, at) {
     v.onerror = () => res();
     v.src = URL.createObjectURL(resolve(f));
   })));
+  updateUi();
   if (wantPlay) playAll();
 }
 
@@ -174,9 +176,10 @@ function updateUi() {
       `<div><span class="k">THROTTLE</span> ${(m.accel * 100).toFixed(0)}%</div>` +
       `<div class="${m.brake ? 'on-brake' : ''}"><span class="k">BRAKE</span> ${m.brake ? 'ON' : '–'}</div>` +
       `<div class="on-b">${m.blinkerLeft ? '◀' : ''}${m.blinkerRight ? '▶' : ''}</div>` +
-      `<div class="ap">${m.autopilot ? AUTOPILOT[m.autopilot] : ''}</div>` +
+      `<div class="ap ap${m.autopilot}"><svg class="wheel" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2"/><path d="M3 12h7M14 12h7M12 14v7"/></svg> ${m.autopilot ? AUTOPILOT[m.autopilot] : ''}</div>` +
       `<div><span class="k">G</span> ${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)}</div>`;
   }
+  updateTopbar(ev, segIdx, t, m, $('units').value);
   drawGraph(t); drawMap(t);
 }
 

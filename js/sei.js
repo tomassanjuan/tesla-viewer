@@ -22,6 +22,7 @@ export function decodeSei(nal) {
     const m = {};
     for (const [n, [name]] of Object.entries(SCHEMA)) m[name] = raw[n] ?? 0;
     for (const k of ['blinkerLeft', 'blinkerRight', 'brake']) m[k] = !!m[k];
+    m.accel = Math.min(1, Math.max(0, m.accel / 100)); // Tesla reports 0-100; expose 0..1
     return m;
   } catch { return null; }
 }

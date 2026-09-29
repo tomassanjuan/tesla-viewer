@@ -26,3 +26,15 @@ canvas{background:#0f1115;border-radius:6px}
 @media(max-width:800px){body{flex-direction:column}aside{width:auto;max-height:35vh}}
 #help{position:fixed;inset:0;margin:auto;width:min(320px,90vw);height:fit-content;background:var(--panel);border:1px solid var(--b);border-radius:8px;padding:16px;z-index:10}
 #help[hidden]{display:none}#help dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}#help dt{font-weight:600}#help dd{margin:0}
+[hidden]{display:none!important}
+#topbar{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;padding:6px 10px;background:var(--panel);border-bottom:1px solid var(--b);font-size:12px;font-variant-numeric:tabular-nums;min-height:32px}
+#topbar:empty{display:none}.tb-name{font-size:13px}
+.apchip{margin-left:auto;display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#252a35;font-weight:600;color:var(--mut)}
+.apchip i{width:9px;height:9px;border-radius:50%;background:currentColor}
+.ap1{color:#b07cff}.ap2{color:#2ecc71}.ap3{color:#5aa9ff}.apchip.ap0{color:var(--mut)}
+#hud .wheel{vertical-align:middle}#hud .ap0{color:var(--mut)}
+@media(max-width:800px){
+  #stage{display:flex;flex-direction:column}#grid{position:relative;inset:auto;flex:1;min-height:0}
+  #hud{position:static;transform:none;flex-wrap:wrap;justify-content:center;gap:4px 10px;padding:6px;border-radius:0;font-size:12px}#hud .spd{font-size:20px}
+  .apchip{margin-left:0}
+}
