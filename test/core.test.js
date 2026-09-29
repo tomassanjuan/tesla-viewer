@@ -108,3 +108,25 @@ test('decrypt roundtrip with the documented scheme', async () => {
   const out = await decrypt(u8, new Uint8Array(key), webcrypto.subtle);
   assert.deepEqual(Buffer.from(out), plain);
 });
+
+test('categories and event-type filtering', async () => {
+  const { categoryOf, eventType, filterEvents, countBy } = await import('../js/library.js');
+  const f = (path) => ({ path, file: path });
+  const evs = groupFiles([
+    f('TeslaCam/SentryClips/2026-06-01_10-00-00/2026-06-01_10-00-00-front.mp4'),
+    f('TeslaCam/SentryClips/2026-06-01_11-00-00/2026-06-01_11-00-00-front.mp4'),
+    f('TeslaCam/SavedClips/2026-06-02_10-00-00/2026-06-02_10-00-00-front.mp4'),
+    f('TeslaCam/RecentClips/2026-06-03_09-00-00-front.mp4'),
+    f('misc/2026-06-04_09-00-00-front.mp4')]);
+  assert.equal(categoryOf('a/SentryClips/x'), 'sentry');
+  assert.deepEqual(countBy(evs, (e) => e.category), { sentry: 2, saved: 1, recent: 1, loose: 1 });
+  assert.equal(filterEvents(evs, { category: 'sentry' }).length, 2);
+  // event.json reason refines the type; folder is the fallback
+  evs.find((e) => e.name === '2026-06-01_10-00-00').reason = 'sentry_aware_object_detection';
+  evs.find((e) => e.name === '2026-06-02_10-00-00').reason = 'user_interaction_honk';
+  assert.equal(eventType({ reason: 'user_interaction_dashcam_icon_tap' }), 'saved');
+  assert.equal(filterEvents(evs, { type: 'honk' }).length, 1);
+  assert.equal(filterEvents(evs, { type: 'sentry' }).length, 2);
+  assert.equal(filterEvents(evs, { category: 'saved', type: 'sentry' }).length, 0);
+  assert.equal(eventType(evs.find((e) => e.category === 'recent')), null);
+});

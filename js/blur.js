@@ -86,6 +86,9 @@ function frame() {
     if (!tile._blur) attach(tile);
     const { cv, vid, cam, drag } = tile._blur, w = cv.clientWidth, h = cv.clientHeight;
     if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const active = drag || (enabled && regionsOf(cam).length);
+    if (!active && tile._blurClean) continue; // nothing to draw: skip the per-frame canvas work
+    tile._blurClean = !active;
     const x = cv.getContext('2d'); x.clearRect(0, 0, w, h);
     const c = st?.ev && contentRect(w, h, vid.videoWidth, vid.videoHeight);
     if (c) drawBlurs(x, cam, c, vid, t);
