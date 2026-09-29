@@ -126,8 +126,10 @@ test('categories and event-type filtering', async () => {
   evs.find((e) => e.name === '2026-06-02_10-00-00').reason = 'user_interaction_honk';
   assert.equal(eventType({ reason: 'user_interaction_dashcam_icon_tap' }), 'saved');
   assert.equal(filterEvents(evs, { type: 'honk' }).length, 1);
-  assert.equal(filterEvents(evs, { type: 'sentry' }).length, 2);
-  assert.equal(filterEvents(evs, { category: 'saved', type: 'sentry' }).length, 0);
+  assert.equal(filterEvents(evs, { type: 'person' }).length, 1);
+  assert.equal(eventType({ reason: 'sentry_accelerometer_motion' }), 'motion');
+  assert.equal(eventType({ reason: 'something_new' }), null);
+  assert.equal(filterEvents(evs, { category: 'saved', type: 'person' }).length, 0);
   assert.equal(eventType(evs.find((e) => e.category === 'recent')), null);
 });
 
