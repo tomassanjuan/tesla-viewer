@@ -28,12 +28,16 @@ function splitByGap(segs, gapS) {
 
 /** files: [{path, file}] where path is the relative path (folders give event names). */
 export function groupFiles(files) {
-  const dirs = new Map(), loose = new Map();
+  const dirs = new Map(), loose = new Map(), extras = [];
   for (const { path, file } of files) {
     const p = parseName(path);
-    if (!p) continue;
     const parts = path.split('/');
     const dir = parts.length > 1 ? parts.slice(-2, -1)[0] : '';
+    if (!p) {
+      const x = /(^|\/)(event\.json|thumb\.png)$/i.exec(path);
+      if (x) extras.push({ dir, kind: x[2].toLowerCase() === 'thumb.png' ? 'thumb' : 'eventJson', file });
+      continue;
+    }
     const isRecent = /RecentClips/i.test(path) || !/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/.test(dir);
     const m = isRecent ? loose : (dirs.get(dir) ?? dirs.set(dir, new Map()).get(dir));
     const seg = m.get(p.ts) ?? { ts: p.ts, cams: {} };
@@ -49,7 +53,25 @@ export function groupFiles(files) {
   for (const [dir, m] of dirs)
     splitByGap(sorted(m), EVENT_GAP_S).forEach((r, i) => out.push(mk('event', i ? `${dir} (${i + 1})` : dir, r)));
   if (loose.size) for (const r of splitByGap(sorted(loose), TRIP_GAP_S)) out.push(mk('trip', null, r));
+  for (const x of extras) { const ev = out.find((e) => e.kind === 'event' && e.name === x.dir); if (ev) ev[x.kind] = x.file; }
   return out.sort((a, b) => b.start - a.start);
+}
+
+const REASONS = {
+  sentry_aware_object_detection: 'Sentry: object detected',
+  user_interaction_dashcam_icon_tap: 'Saved: dashcam icon tap',
+  user_interaction_dashcam_panel_save: 'Saved: dashcam panel',
+};
+
+/** Parsed Tesla event.json -> { reason, place } display strings ('' when unknown). */
+export function formatEventInfo(j) {
+  if (!j || typeof j !== 'object') return { reason: '', place: '' };
+  const r = String(j.reason ?? '');
+  const reason = REASONS[r] ?? r.replace(/^user_interaction_/, '').replace(/_/g, ' ');
+  const lat = +j.est_lat, lon = +j.est_lon;
+  const place = [j.street, j.city].filter(Boolean).join(', ') ||
+    (Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon) ? `${lat.toFixed(4)}, ${lon.toFixed(4)}` : '');
+  return { reason, place };
 }
 
 export function tsToDate(ts) {

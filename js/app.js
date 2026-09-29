@@ -1,10 +1,15 @@
-import { groupFiles, CAMS } from './library.js';
+import { groupFiles, CAMS, formatEventInfo } from './library.js';
+import { init as initInsights } from './insights.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
+import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
-import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
+import { t } from './i18n.js';
+import { parseHeader } from './tesla-crypto.js';
+import { initDecryptUi } from './decrypt-ui.js';
 
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = (id) => document.getElementById(id);
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repeater: 'Right', left_pillar: 'L pillar', right_pillar: 'R pillar' };
@@ -22,9 +27,10 @@ async function addFiles(list) {
   for (const { file } of items) {
     if (!/\.mp4$/i.test(file.name)) continue;
     const head = new Uint8Array(await file.slice(0, 0x2000).arrayBuffer());
-    if (isEncrypted(head)) encrypted.set(file, parseHeader(head));
+    try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
+  for (const e of events) if (e.eventJson) { try { e.info = formatEventInfo(JSON.parse(await e.eventJson.text())); } catch { /* bad json: ignore */ } }
   renderEvents();
   updateCryptUi();
   if (events.length) openEvent(events[0]);
@@ -37,19 +43,32 @@ const dayLabel = (d) => {
   return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 };
 
+const thumbUrls = [];
 function renderEvents() {
   if (!document.getElementById('grp-css')) document.head.append(Object.assign(document.createElement('style'), { id: 'grp-css',
     textContent: '.grp-h{margin:12px 4px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b93a1}.grp-h:first-child{margin-top:0}' }));
   $('events').innerHTML = '';
+  for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
   let day = null;
   for (const e of events) {
     if (e.day !== day) {
       day = e.day;
       const h = document.createElement('div'); h.className = 'grp-h'; h.textContent = dayLabel(e.start); $('events').append(h);
     }
-    const d = document.createElement('div'); d.className = 'ev';
-    d.innerHTML = `<b>${e.name}</b><small>${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min-clips</small>`;
+    const d = document.createElement('div'); d.className = 'ev'; d.tabIndex = 0; d.setAttribute('role', 'listitem');
+    const nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
+    d.innerHTML = `<b></b><span class="when">${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
+    d.firstChild.textContent = e.name;
+    const info = [e.info?.reason, e.info?.place].filter(Boolean).join(' · ');
+    if (info) { const s = document.createElement('small'); s.textContent = info; d.append(s); }
+    if (e.thumb) {
+      const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
+      const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
+      im.style.cssText = 'display:block;width:100%;max-width:160px;border-radius:4px;margin-top:4px';
+      d.prepend(im);
+    }
     d.onclick = () => openEvent(e);
+    d.onkeydown = (k) => { if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); openEvent(e); } };
     e._el = d; $('events').append(d);
   }
 }
@@ -89,7 +108,8 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
-  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet'
+  insightsRefresh.forEach((f) => f());
+  $('status').textContent = hevc && !samples.length ? 'HEVC clip: video plays if your browser supports it; no telemetry found'
     : withTel < segs.length - blocked ? `${withTel}/${segs.length - blocked} clips have telemetry${firstErr ? ` (${firstErr})` : ''}` : '';
   console.info('telemetry', diag);
   if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
@@ -112,7 +132,9 @@ function buildGrid() {
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
     d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
+    d.tabIndex = 0; d.setAttribute('aria-label', `${NAMES[c]} camera, click to focus`);
     d.onclick = () => { focusCam = c; applyLayout(); };
+    d.onkeydown = (k) => { if (k.key === 'Enter') { focusCam = c; applyLayout(); } };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
   applyLayout();
@@ -147,8 +169,8 @@ async function loadSeg(i, at) {
   if (wantPlay) playAll();
 }
 
-function playAll() { playing = true; $('play').textContent = '⏸'; for (const v of Object.values(vids)) v.src && v.play().catch(() => {}); requestAnimationFrame(tick); }
-function pauseAll() { playing = false; $('play').textContent = '▶'; for (const v of Object.values(vids)) v.pause(); }
+function playAll() { playing = true; $('play').classList.add('is-playing'); for (const v of Object.values(vids)) v.src && v.play().catch(() => {}); requestAnimationFrame(tick); }
+function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
 function stop() { wantPlay = false; if (ev) pauseAll(); }
 
 function globalTime() { const m = master(); return ev.segs[segIdx].start + (m?.currentTime ?? 0); }
@@ -185,33 +207,36 @@ function sampleAt(t) {
 function updateUi() {
   const t = globalTime();
   $('seek').value = ev.total ? (t / ev.total) * 1000 : 0;
+  $('seekwrap').style.setProperty('--p', `${ev.total ? (t / ev.total) * 100 : 0}%`);
   $('time').textContent = `${fmt(t)} / ${fmt(ev.total)}`;
   const m = sampleAt(t);
   if (m) {
     const kmh = m.speedMps * 3.6, mph = m.speedMps * 2.23694, u = $('units').value;
+    const cl = (v) => Math.max(-1, Math.min(1, v));
+    const arrow = (dir, on) => `<svg viewBox="0 0 24 24" class="${on ? 'on' : ''}"><path d="${dir ? 'M4 7l9 5-9 5z M13 7l7 5-7 5z' : 'M20 7l-9 5 9 5z M11 7l-7 5 7 5z'}" fill="currentColor"/></svg>`;
     $('hud').innerHTML =
-      `<div><span class="spd">${Math.round(u === 'kmh' ? kmh : mph)}</span> <span class="k">${u === 'kmh' ? 'km/h' : 'mph'}</span></div>` +
-      `<div><span class="k">GEAR</span> ${GEAR[m.gear] ?? '?'}</div>` +
-      `<div><span class="k">STEER</span> ${m.steering.toFixed(0)}°</div>` +
-      `<div><span class="k">THROTTLE</span> ${(m.accel * 100).toFixed(0)}%</div>` +
-      `<div class="${m.brake ? 'on-brake' : ''}"><span class="k">BRAKE</span> ${m.brake ? 'ON' : '–'}</div>` +
-      `<div class="on-b">${m.blinkerLeft ? '◀' : ''}${m.blinkerRight ? '▶' : ''}</div>` +
-      `<div class="ap">${m.autopilot ? AUTOPILOT[m.autopilot] : ''}</div>` +
-      `<div><span class="k">G</span> ${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)}</div>`;
+      `<div class="h-speed"><b>${Math.round(u === 'kmh' ? kmh : mph)}</b><small>${u === 'kmh' ? 'km/h' : 'mph'}</small></div>` +
+      `<div class="h-gear" title="Gear">${['P', 'R', 'N', 'D'].map((g) => `<i class="${GEAR[m.gear] === g ? 'on' : ''}">${g}</i>`).join('')}</div>` +
+      `<div class="h-wheel"><svg viewBox="0 0 48 48" style="transform:rotate(${m.steering}deg)"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M4.5 22h13.5M30 22h13.5M24 28v16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg><b>${m.steering.toFixed(0)}°</b></div>` +
+      `<div class="h-pedals"><div class="h-bar"><i style="--v:${Math.round(m.accel * 100)}%"></i><span class="k">Thr</span></div>` +
+      `<div class="h-bar brake"><i style="--v:${m.brake ? 100 : 0}%"></i><span class="k">Brk</span></div></div>` +
+      `<div class="h-turn">${arrow(0, m.blinkerLeft)}${arrow(1, m.blinkerRight)}</div>` +
+      (m.autopilot ? `<div class="h-ap">${AUTOPILOT[m.autopilot]}</div>` : '') +
+      `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
   }
-  drawGraph(t); drawMap(t);
+  drawGraph(tm); drawMap(tm);
 }
 
-function drawGraph(t = 0) {
+function drawGraph(tm = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
-  if (!ev?.samples.length) { x.fillStyle = '#8b93a1'; x.fillText('No telemetry in these clips', 10, 20); return; }
+  if (!ev?.samples.length) { x.fillStyle = css('--mut'); x.fillText('No telemetry in these clips', 10, 20); return; }
   const max = Math.max(1, ...ev.samples.map((s) => s.speedMps * 3.6));
-  x.strokeStyle = '#5aa9ff'; x.beginPath();
+  x.strokeStyle = css('--info'); x.lineWidth = 2; x.beginPath();
   ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
   x.stroke();
-  x.strokeStyle = '#e31937'; x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
-  x.fillStyle = '#8b93a1'; x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
+  x.lineWidth = 1; x.strokeStyle = css('--accent'); x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
+  x.fillStyle = css('--mut'); x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
 }
 
 function drawMap(t) {
@@ -219,39 +244,12 @@ function drawMap(t) {
 }
 
 // ---------- encryption ----------
-function updateCryptUi() {
-  const n = [...encrypted.keys()].filter((f) => !decrypted.has(f)).length;
-  $('cryptCount').textContent = encrypted.size ? `${n} of ${encrypted.size} encrypted clips still locked.` : 'No encrypted clips loaded.';
-  if (n) $('crypt').open = true;
-}
-
-async function decryptAll(keys) {
-  let ok = 0, missing = 0;
-  for (const [f, h] of encrypted) {
-    if (decrypted.has(f)) continue;
-    const key = keys[h.id];
-    if (!key) { missing++; continue; }
-    try {
-      const out = await decrypt(new Uint8Array(await f.arrayBuffer()), key);
-      decrypted.set(f, new Blob([out], { type: 'video/mp4' })); ok++;
-      $('cryptMsg').textContent = `Decrypted ${ok}…`;
-    } catch (e) { $('cryptMsg').textContent = 'Decrypt failed: ' + e.message; }
-  }
-  $('cryptMsg').textContent = `Decrypted ${ok}, no key for ${missing}.`;
-  updateCryptUi();
-  if (ok && ev) openEvent(ev.e);
-}
-
-$('fetchKeys').onclick = async () => {
-  try {
-    const hs = [...encrypted.entries()].filter(([f]) => !decrypted.has(f)).map(([, h]) => h);
-    $('cryptMsg').textContent = 'Requesting keys…';
-    await decryptAll(await fetchKeys(hs, $('token').value.trim()));
-  } catch (e) { $('cryptMsg').textContent = `${e.message}. If this is a CORS/network error, fetch keys another way and paste them as JSON.`; }
-};
-$('useKeys').onclick = () => { try { decryptAll(parseKeyJson($('keyJson').value)); } catch (e) { $('cryptMsg').textContent = 'Bad JSON: ' + e.message; } };
+const cryptUi = initDecryptUi({ encrypted, decrypted, onUnlocked: () => ev && openEvent(ev.e) });
+const updateCryptUi = () => cryptUi.update();
 
 // ---------- wiring ----------
+$('reopen').onclick = () => $('pickDir').click();
+addEventListener('themechange', () => ev && updateUi());
 $('pickDir').onchange = (e) => addFiles(e.target.files);
 $('pickFiles').onchange = (e) => addFiles(e.target.files);
 const drop = $('drop');
@@ -289,5 +287,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
+const insightsRefresh = [];
+initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (f) => insightsRefresh.push(f) });
+initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
 initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });

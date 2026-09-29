@@ -1,4 +1,5 @@
 import { decodeSei } from './sei.js';
+import { hvcCLengthSize, scanHevc } from './hevc.js';
 
 const ascii = (dv, o) => String.fromCharCode(dv.getUint8(o), dv.getUint8(o + 1), dv.getUint8(o + 2), dv.getUint8(o + 3));
 
@@ -28,6 +29,12 @@ export function parseClip(buffer) {
   const moov = findBox(dv, 0, dv.byteLength, 'moov');
   const mdats = findBoxes(dv, 0, dv.byteLength, 'mdat');
   if (!moov || !mdats.length) throw new Error('Not an MP4 (no moov/mdat)');
+  const mvhd = findBox(dv, moov.start, moov.end, 'mvhd');
+  let created = null;
+  if (mvhd) {
+    const secs = dv.getUint8(mvhd.start) === 1 ? Number(dv.getBigUint64(mvhd.start + 4)) : dv.getUint32(mvhd.start + 4);
+    if (secs) created = (secs - 2082844800) * 1000; // 1904 epoch -> unix ms
+  }
   // prefer the video track (hdlr 'vide'); fall back to the first trak
   const traks = findBoxes(dv, moov.start, moov.end, 'trak');
   const isVide = (t) => { const h = findBox(dv, findBox(dv, t.start, t.end, 'mdia')?.start ?? 0, findBox(dv, t.start, t.end, 'mdia')?.end ?? 0, 'hdlr'); return h && ascii(dv, h.start + 8) === 'vide'; };
@@ -51,8 +58,11 @@ export function parseClip(buffer) {
   }
 
   const hevc = codec === 'hvc1' || codec === 'hev1';
-  // ponytail: HEVC SEI (different NAL header + proto) not decoded; duration only.
-  if (hevc) return { codec, hevc, width, height, duration: durations.reduce((a, b) => a + b, 0), samples: [] };
+  if (hevc) {
+    const hvcC = findBox(dv, entry + 8 + 78, Math.min(entry + dv.getUint32(entry), stsd.end), 'hvcC');
+    const r = scanHevc(dv, u8, mdats[0], hvcC ? hvcCLengthSize(u8, hvcC.start) : 4, durations);
+    return { codec, hevc, width, height, created, duration: durations.reduce((a, b) => a + b, 0) || r.duration, samples: r.samples };
+  }
   const samples = [];
   let pending = null, frame = 0, t = 0;
   for (const mdat of mdats) {   // ponytail: assumes NAL stream is contiguous per mdat; use stsz/stco if a camera interleaves tracks
@@ -68,7 +78,7 @@ export function parseClip(buffer) {
       cursor += len;
     }
   }
-  return { codec, hevc, width, height, duration: t, samples };
+  return { codec, hevc, width, height, created, duration: t, samples };
 }
 
 export function isMp4(u8) {

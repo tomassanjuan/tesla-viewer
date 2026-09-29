@@ -22,8 +22,17 @@ Goal: a free, fully on-device alternative to tesclip.com. Static site, no backen
       engineering and are unverified against real clips here.
 - [x] **P5 Export**: set in/out, export grid or focused cam with optional HUD via canvas.captureStream + MediaRecorder (mp4 if supported, else webm; real-time, js/export.js). WebCodecs faster-than-realtime muxing is a possible upgrade.
 - [x] **P6 Map tiles** (opt-in, off by default to stay fully offline), reverse-geocode-free location display.
-- [~] **P7 Polish**: done: PWA/offline install (manifest, sw.js cache-first, icon), HEVC clips detected + non-crashing status (SEI decode still open, dashcam#14), `?` shortcut help, aria-labels. Open: HEVC SEI decode, i18n, license-plate blur.
-- [ ] **P8 Verify encryption** against real clips; CORS-free key flow (browser extension or paste flow) if Tesla blocks cross-origin.
+- [x] **P7 Polish**: PWA/offline install (manifest, cache-first sw.js), `?` shortcut help, aria-labels; HEVC clips (hvcC length size, prefix/suffix SEI in js/hevc.js, tolerant protobuf + `fieldsSeen` diagnostics; synthetic-fixture tested only, dashcam#14); i18n (10 locales, runtime DOM translation, js/i18n.js; translations not native-reviewed); manual privacy blur (js/blur.js, burned into exports; no automatic plate detector shipped).
+- [~] **P8 Encryption hardening**: strict header validation, wrong-key detection, streaming decrypt with progress/abort, key-JSON shapes, retrying key fetch with clear CORS/401 messages (js/tesla-crypto.js, js/decrypt-ui.js, docs/encryption.md). Still unverified against real encrypted clips; header id/size overlap is the top risk.
+- [x] **P9 Insights**: `event.json` (reason, place) and `thumb.png` shown on event cards; js/insights.js computes trip summary
+      (GPS distance with jitter filter, duration, max/avg speed, autopilot %, hard braking/accel, sharp turns, AP engage/disengage)
+      in a units-aware panel, plus clickable timeline ticks that seek. Thresholds are heuristics (`DEFAULTS`), not calibrated.
+- [x] **P10 UI redesign**: design tokens, dark/light theme, dashboard HUD, icon dock, empty-state drop zone, responsive layout (style.css, js/ui.js).
+
+## Open
+- Verify everything on real TeslaCam clips (playback sync, export, HEVC SEI, encryption).
+- Faster-than-realtime export via WebCodecs + muxer; export audio.
+- Automatic plate detection would need an ML model shipped on-device.
 
 ## Non-goals
 Uploading video anywhere, accounts, ads, watermarks.

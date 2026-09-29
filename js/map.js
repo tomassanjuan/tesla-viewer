@@ -1,5 +1,7 @@
 // Map panel: offline canvas track by default; optional OpenStreetMap tiles (opt-in).
+import { t } from './i18n.js';
 const TS = 256;
+const css = (v) => (typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888' : '#888');
 
 // Web Mercator: lat/lon -> world pixel coords at zoom z (256px tiles).
 export function project(lat, lon, z) {
@@ -51,7 +53,7 @@ export function createMap(canvas) {
     const W = canvas.width, H = canvas.height;
     x.clearRect(0, 0, W, H);
     const pts = (points || []).filter((s) => s.lat || s.lon);
-    if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText('No GPS', 10, 20); return; }
+    if (!pts.length) { x.fillStyle = css('--mut'); x.fillText('No GPS', 10, 20); return; }
     let P;
     if (tiles) {
       const b = bounds(pts), clat = (b.minLat + b.maxLat) / 2, clon = (b.minLon + b.maxLon) / 2;
@@ -70,10 +72,10 @@ export function createMap(canvas) {
       const sc = Math.min((W - 20) / (Math.max(...X) - minX || 1e-6), (H - 20) / (Math.max(...Y) - minY || 1e-6));
       P = (p) => [10 + (p.lon * k - minX) * sc, 10 + (-p.lat - minY) * sc];
     }
-    x.strokeStyle = '#5aa9ff'; x.lineWidth = 2; x.beginPath();
+    x.strokeStyle = css('--info'); x.lineWidth = 2; x.beginPath();
     pts.forEach((p, i) => { const [a, b] = P(p); i ? x.lineTo(a, b) : x.moveTo(a, b); }); x.stroke(); x.lineWidth = 1;
     const [a, b] = P(pts.includes(cur) ? cur : pts[0]);
-    x.fillStyle = '#e31937'; x.beginPath(); x.arc(a, b, 4, 0, 7); x.fill();
+    x.fillStyle = css('--accent'); x.beginPath(); x.arc(a, b, 4, 0, 7); x.fill();
   }
 
   canvas.addEventListener('click', () => {

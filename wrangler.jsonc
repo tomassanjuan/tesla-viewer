@@ -1,5 +1,6 @@
 {
   "name": "tesla-viewer",
   "compatibility_date": "2026-09-01",
-  "assets": { "directory": "./" }
+  "assets": { "directory": "./" },
+  "previews": {}
 }
