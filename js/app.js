@@ -1,5 +1,4 @@
 import { groupFiles, tsToDate, CAMS, formatEventInfo } from './library.js';
-import { updateTopbar } from './topbar.js';
 import { init as initInsights } from './insights.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
