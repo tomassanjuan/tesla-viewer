@@ -1,6 +1,7 @@
 // i18n without a build step. Keys are the English strings (js/locales/en.js). Static markup is translated at
 // runtime by matching trimmed text nodes / title, placeholder, aria-label attributes; JS strings go through t().
 import en from './locales/en.js';
+import { seg } from './seg.js';
 
 export const LANGS = { en: 'English', es: 'Español', de: 'Deutsch', fr: 'Français', pt: 'Português', it: 'Italiano', nl: 'Nederlands', pl: 'Polski', ja: '日本語', zh: '中文' };
 const ATTRS = ['title', 'placeholder', 'aria-label'];
@@ -52,8 +53,9 @@ export async function setLang(l, persist = true) {
 }
 
 if (typeof document !== 'undefined') {
-  const sel = document.createElement('select'); sel.id = 'lang'; sel.setAttribute('aria-label', 'Language');
-  for (const [k, v] of Object.entries(LANGS)) sel.add(new Option(v, k));
+  const sel = document.createElement('div'); sel.id = 'lang'; sel.className = 'seg'; sel.setAttribute('aria-label', 'Language');
+  for (const [k, v] of Object.entries(LANGS)) { const b = Object.assign(document.createElement('button'), { type: 'button', textContent: k.toUpperCase(), title: v }); b.dataset.v = k; sel.append(b); }
+  seg(sel);
   sel.onchange = () => setLang(sel.value);
   (document.getElementById('extras-side') ?? document.body).append(sel);
   new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) apply(n); })

@@ -94,4 +94,7 @@ export default {
   "Day": "Giorno",
   "City": "Città",
   "Unknown": "Sconosciuta",
+  "Dashboard": "Cruscotto",
+  "None": "Nessuno",
+  "Telemetry only, no cameras": "Solo telemetria, senza telecamere",
 };

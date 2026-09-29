@@ -47,9 +47,7 @@
   <h2 class="eyebrow">Library</h2>
   <div id="cats" class="cats" role="group" aria-label="Category"></div>
   <div id="evtype" class="cats" role="group" aria-label="Event type"></div>
-  <select id="groupby" aria-label="Group by" hidden>
-    <option value="none">No grouping</option><option value="day" selected>Day</option><option value="city">City</option>
-  </select>
+  <div id="groupby" class="seg" aria-label="Group by" hidden><button type="button" data-v="none">None</button><button type="button" data-v="day" class="on">Day</button><button type="button" data-v="city">City</button></div>
   <div id="events" role="list"></div>
   <details id="crypt"><summary>Encrypted clips (2026.20+) <em>experimental</em></summary>
     <p class="note">Decryption runs locally. The per-file key comes from Tesla, tied to your account.</p>
@@ -95,9 +93,9 @@
         <button id="stepF" class="ibtn" type="button" title="Forward one frame (.)" aria-label="Step forward one frame"><svg class="ic"><use href="#i-next"/></svg></button>
       </div>
       <div class="grp">
-        <label class="sel" title="Playback speed"><span>Speed</span><select id="speed" aria-label="Playback speed"><option value="0.1">0.1x</option><option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option><option value="4">4x</option><option value="10">10x</option></select></label>
-        <label class="sel"><span>View</span><select id="layout" aria-label="Layout"><option value="auto">Grid</option><option value="focus">Focus</option></select></label>
-        <label class="sel"><span>Units</span><select id="units" aria-label="Speed units"><option value="kmh">km/h</option><option value="mph">mph</option></select></label>
+        <div class="sel" title="Playback speed"><span>Speed</span><div id="speed" class="seg" aria-label="Playback speed"><button type="button" data-v="0.1">0.1x</button><button type="button" data-v="0.25">0.25x</button><button type="button" data-v="0.5">0.5x</button><button type="button" data-v="1" class="on">1x</button><button type="button" data-v="2">2x</button><button type="button" data-v="4">4x</button><button type="button" data-v="10">10x</button></div></div>
+        <div class="sel"><span>View</span><div id="layout" class="seg" aria-label="Layout"><button type="button" data-v="auto" class="on">Grid</button><button type="button" data-v="focus">Focus</button><button type="button" data-v="dash" title="Telemetry only, no cameras">Dashboard</button></div></div>
+        <div class="sel"><span>Units</span><div id="units" class="seg" aria-label="Speed units"><button type="button" data-v="kmh" class="on">km/h</button><button type="button" data-v="mph">mph</button></div></div>
       </div>
       <div class="grp trimgrp">
         <button id="setIn" class="btn" type="button" title="Set trim start"><svg class="ic"><use href="#i-in"/></svg>In</button>
