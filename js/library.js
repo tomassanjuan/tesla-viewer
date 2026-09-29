@@ -33,15 +33,15 @@ export function categoryOf(path) {
   return m ? m[2].toLowerCase() : 'loose';
 }
 
-export const EVENT_TYPES = ['sentry', 'saved', 'honk', 'other'];
-/** Event type from event.json `reason`; falls back to the folder when there is no event.json. null for continuous recording. */
+export const EVENT_TYPES = ['person', 'motion', 'honk', 'saved'];
+/** Concrete event type from event.json `reason`, or null when it is not one of them (still listed under All). */
 export function eventType(e) {
   const r = String(e.reason ?? '');
-  if (/^sentry/i.test(r)) return 'sentry';
+  if (/^sentry.*(object|person)/i.test(r)) return 'person';
+  if (/^sentry.*(motion|accelerometer)/i.test(r)) return 'motion';
   if (/honk/i.test(r)) return 'honk';
   if (/^user_interaction/i.test(r)) return 'saved';
-  if (r) return 'other';
-  return e.category === 'sentry' ? 'sentry' : e.category === 'saved' ? 'saved' : e.category === 'recent' ? null : 'other';
+  return r ? null : e.category === 'saved' ? 'saved' : null; // no catch-all type: unknown reasons show only under All
 }
 
 /** Counts per category / type over `events` (for badges). */
