@@ -194,45 +194,17 @@ canvas{background:transparent}
 #help dl{display:grid;grid-template-columns:auto 1fr;gap:var(--s2) var(--s4);margin:0}
 #help dt{font-family:var(--mono);font-weight:600}#help dd{margin:0;color:var(--mut)}
 
-/* ---------- responsive ---------- */
-@media (max-width:860px){
-  #app{display:flex;flex-direction:column;height:auto;min-height:100dvh}
-  main{order:1}
-  #side{order:2;border-right:0;border-top:1px solid var(--border);overflow:visible}
-  .side-off #side{display:flex}
-  #sideToggle{display:none}
-  #stage{flex:none;height:min(62vw,52dvh);min-height:230px}
-  #hud{gap:var(--s3);padding:var(--s2) var(--s3);bottom:var(--s2);transform:translateX(-50%) scale(.82);transform-origin:bottom center;flex-wrap:wrap;justify-content:center;width:max-content;max-width:120%}
-  .h-speed b{font-size:36px}
-  .h-g,.h-wheel b{display:none}
-  #bar{padding:var(--s2) var(--s3) var(--s3)}
-  .ibtn{width:44px;height:44px}.ibtn.play{width:52px;height:52px}
-  .btn{min-height:44px}
-  .seg button{min-height:44px}
-  .chip{min-height:36px}
-  .dock-row{gap:var(--s2) var(--s3)}
-  .grp.end{margin-left:0}
-  .trimgrp{width:100%}
-  #panels{flex-direction:column;padding:var(--s3)}
-  #mapbox{width:100%}
-  #map.big{right:var(--s2);bottom:var(--s2)}
-  #seek::-webkit-slider-thumb{width:22px;height:22px;margin-top:-8px}
-  #seekwrap,#seek{height:40px}
-}
-@media (max-width:480px){.sel span{display:none}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
 
 .blur-btn{font:inherit;font-weight:500;min-height:36px;padding:0 var(--s3);border-radius:var(--r-pill);border:1px solid var(--border);background:var(--surface-2);color:var(--fg);cursor:pointer}
 .blur-btn:hover{border-color:var(--accent)}
 .blur-btn:focus-visible{outline:none;box-shadow:var(--ring)}
-@media(max-width:800px){#map{height:auto;aspect-ratio:2/1;max-height:200px}}
 
 .cats{display:flex;flex-wrap:wrap;gap:var(--s2);margin:var(--s2) 0}
 .cats:empty{display:none}
 .cat{font:inherit;font-size:12px;color:var(--mut);background:none;padding:0 var(--s3);min-height:28px;border:1px solid var(--border);border-radius:var(--r-pill);cursor:pointer}
 .cat:hover{border-color:var(--mut)}
 .cat.on{color:var(--fg);border-color:var(--accent);background:var(--surface-3)}
-@media (max-width:720px){.cat{min-height:36px}}
 .ev .ttl{grid-column:1/-1;display:flex;align-items:center;gap:var(--s2);min-width:0}
 .ev .ttl b{min-width:0}
 .ev small{grid-column:1/-1}
@@ -268,4 +240,107 @@ canvas{background:transparent}
 #app.dash #graph{flex:1 1 0;min-height:0;height:100%;aspect-ratio:auto}
 #app.dash #mapbox{width:min(46%,560px);display:flex;flex-direction:column}
 #app.dash #map{flex:1 1 0;min-height:0;height:0;max-height:none;aspect-ratio:auto}
-@media (max-width:860px){#app.dash #stage{height:min(80vw,60dvh)}#app.dash #panels{flex-direction:column}#app.dash #graph{height:140px;flex:none}#app.dash #mapbox{width:100%}#app.dash #map{height:200px;flex:none}}
+
+/* ---------- phone (portrait + landscape) ----------
+   Shell layout: the page never scrolls. <main> is the scroll container; the video stage and the
+   scrub/transport rows are sticky, so the video stays visible while controls, graph and map scroll
+   beneath. The library becomes a slide-over drawer. Keep the query in sync with PHONE in js/app.js. */
+#mbar,#scrim{display:none}
+@media (max-width:860px),(orientation:landscape) and (max-height:520px) and (max-width:1000px){
+  :root{--mbar:calc(48px + env(safe-area-inset-top));--stage-h:min(calc(100vw * .66 + 82px),46dvh);--strip:82px}
+  button,label,.cam{-webkit-tap-highlight-color:transparent}
+  #app{display:block;height:100dvh;overflow:hidden}
+  main{height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+  #mbar{display:flex;align-items:center;gap:var(--s3);height:var(--mbar);padding:env(safe-area-inset-top) var(--s3) 0;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:8}
+  #mbar b{font-size:16px;letter-spacing:-.01em}
+
+  /* drawer */
+  #side{position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(88vw,340px);border:0;border-right:1px solid var(--border);box-shadow:var(--shadow-2);overflow:auto;overscroll-behavior:contain;padding:calc(var(--s4) + env(safe-area-inset-top)) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom)) calc(var(--s4) + env(safe-area-inset-left));transform:translateX(-105%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s}
+  .side-off #side{display:flex}
+  .side-open #side{transform:none;visibility:visible;transition:transform .22s ease}
+  #scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s}
+  .side-open #scrim{opacity:1;pointer-events:auto}
+  #sideToggle{display:none}
+  .cat{min-height:36px}
+
+  /* stage: one large camera + a swipeable strip of the others (tap a thumbnail to swap) */
+  #stage{--strip:0px;position:sticky;top:var(--mbar);z-index:7;flex:none;height:var(--stage-h);display:flex;flex-direction:column;justify-content:flex-end}
+  #stage:has(.cam+.cam){--strip:82px}
+  #stage:has(#grid.focus){--strip:0px}
+  #grid{position:static;display:flex;gap:4px;padding:0 4px;height:var(--strip);flex:none;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scroll-snap-type:x proximity;scrollbar-width:none;align-items:center}
+  #grid::-webkit-scrollbar{display:none}
+  #stage:has(.cam+.cam) #grid{padding:4px}
+  .cam{flex:0 0 auto;height:100%;aspect-ratio:4/3;scroll-snap-align:start;border:1px solid var(--border)}
+  .cam span{font-size:9px;left:4px;top:4px;padding:1px 6px}
+  .cam.main{position:absolute;left:0;right:0;top:0;bottom:var(--strip);height:auto;aspect-ratio:auto;border-radius:0;border:0}
+  .cam.main span{font-size:11px;left:var(--s2);top:var(--s2);padding:2px 8px}
+  #grid.focus .cam:not(.main){display:none}
+  #hud{bottom:calc(var(--strip) + var(--s2));transform:translateX(-50%) scale(.8);transform-origin:bottom center;gap:var(--s3);padding:var(--s2) var(--s3);flex-wrap:wrap;justify-content:center;width:max-content;max-width:124%}
+  .h-speed b{font-size:36px}
+  .h-g,.h-wheel b{display:none}
+
+  /* dock: scrub + transport stay pinned under the video, the rest scrolls */
+  #bar,.dock-row{display:contents}
+  .scrub{position:sticky;top:calc(var(--mbar) + var(--stage-h));z-index:6;height:44px;padding:0 var(--s4);background:var(--surface);border-top:1px solid var(--border)}
+  .dock-row>.grp:first-child{position:sticky;top:calc(var(--mbar) + var(--stage-h) + 44px);z-index:6;justify-content:center;gap:var(--s5);padding:var(--s1) var(--s4) var(--s2);background:var(--surface);border-bottom:1px solid var(--border)}
+  .dock-row>.grp:not(:first-child){padding:var(--s2) var(--s4);background:var(--surface)}
+  .dock-row>.grp:nth-child(2){display:grid;gap:var(--s2);padding-top:var(--s3)}
+  .ibtn{width:44px;height:44px}.ibtn.play{width:52px;height:52px}
+  .btn{min-height:44px}
+  .time{min-width:78px}
+  #seekwrap,#seek{height:44px}
+  #seek{touch-action:none}
+  #seek::-webkit-slider-runnable-track{height:8px;border-radius:4px}
+  #seek::-webkit-slider-thumb{width:26px;height:26px;margin-top:-9px}
+  #seek::-moz-range-thumb{width:22px;height:22px}
+  .sel{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--s2)}
+  .dock-row .seg{display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%}
+  .dock-row .seg::-webkit-scrollbar{display:none}
+  .dock-row .seg button{flex:1 0 auto;min-height:40px;padding:0 var(--s4)}
+  #gapgrp{display:grid;grid-template-columns:1fr 1fr}
+  .trimgrp{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:var(--s2)}
+  .trimgrp .btn{grid-column:span 3;justify-content:center;padding:0 var(--s2)}
+  .trimgrp .btn.primary{grid-column:1/-1}
+  .trimgrp .chip{grid-column:span 3;min-height:40px;padding:var(--s1) var(--s3);line-height:1.25}
+  .trimgrp #trimInfo{grid-column:1/-1}
+  .grp.end{margin-left:0}
+  #extras-dock{flex-wrap:wrap}
+  #extras-dock button{font:inherit;font-weight:500;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-pill);min-height:40px;padding:0 var(--s3);cursor:pointer}
+  #extras-dock button[aria-pressed=true]{background:var(--accent);border-color:transparent;color:var(--on-accent)}
+
+  /* nothing loaded yet: no pinned video/dock, just a compact drop zone above the (scrolling) controls */
+  main:has(#empty:not([hidden])) #stage{position:relative;top:auto;height:auto;overflow:visible;display:block}
+  main:has(#empty:not([hidden])) #empty{position:static;padding:var(--s3)}
+  main:has(#empty:not([hidden])) #drop{padding:var(--s5) var(--s4)}
+  main:has(#empty:not([hidden])) #drop p:not(.privacy){display:none}
+  main:has(#empty:not([hidden])) .scrub,main:has(#empty:not([hidden])) .dock-row>.grp:first-child{position:static}
+  main:has(#empty:not([hidden])) #grid{display:none}
+  main:has(#empty:not([hidden])){display:block}
+
+  #panels{flex-direction:column;padding:var(--s3) var(--s4) var(--s5)}
+  #graph{aspect-ratio:3/1}
+  #mapbox{width:100%}
+  #map{aspect-ratio:16/10}
+  #map.big{width:calc(100vw - 16px);right:8px;bottom:calc(8px + env(safe-area-inset-bottom))}
+
+  /* dashboard: taller telemetry area, graph + map stacked below */
+  #app.dash{--stage-h:min(calc(100vw * .9),52dvh)}
+  #app.dash #stage{display:block}
+  #app.dash #panels{flex:none;flex-direction:column}
+  #app.dash #graph{height:auto;aspect-ratio:3/1;flex:none}
+  #app.dash #mapbox{width:100%}
+  #app.dash #map{height:auto;aspect-ratio:16/10;flex:none}
+}
+@media (orientation:landscape) and (max-height:520px) and (max-width:1000px){
+  :root{--mbar:calc(44px + env(safe-area-inset-top));--stage-h:0px}
+  #app.dash{--stage-h:0px}
+  .scrub{height:40px}
+  .dock-row>.grp:first-child{top:calc(var(--mbar) + 40px);padding-bottom:var(--s1)}
+  .ibtn{width:40px;height:40px}.ibtn.play{width:46px;height:46px}
+  #seekwrap,#seek{height:40px}
+  main{grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr)}
+  main>:not(#stage),#bar>*,.dock-row>*{grid-column:2}
+  #stage,#app.dash #stage{grid-column:1;grid-row:1/span 40;top:0;height:100dvh}
+  #app.dash #stage{display:block}
+}
