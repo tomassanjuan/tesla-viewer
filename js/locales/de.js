@@ -85,4 +85,11 @@ export default {
   "Honk": "Hupe",
   "Other": "Sonstige",
   "No events match this filter.": "Keine Ereignisse passen zu diesem Filter.",
+  "Telemetry": "Telemetrie",
+  "Telemetry available": "Telemetrie verfügbar",
+  "Group by": "Gruppieren nach",
+  "No grouping": "Keine Gruppierung",
+  "Day": "Tag",
+  "City": "Stadt",
+  "Unknown": "Unbekannt",
 };

@@ -85,4 +85,11 @@ export default {
   "Honk": "Buzina",
   "Other": "Outro",
   "No events match this filter.": "Nenhum evento corresponde a este filtro.",
+  "Telemetry": "Telemetria",
+  "Telemetry available": "Telemetria disponível",
+  "Group by": "Agrupar por",
+  "No grouping": "Sem agrupamento",
+  "Day": "Dia",
+  "City": "Cidade",
+  "Unknown": "Desconhecida",
 };

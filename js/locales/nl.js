@@ -85,4 +85,11 @@ export default {
   "Honk": "Claxon",
   "Other": "Overig",
   "No events match this filter.": "Geen gebeurtenissen voldoen aan dit filter.",
+  "Telemetry": "Telemetrie",
+  "Telemetry available": "Telemetrie beschikbaar",
+  "Group by": "Groeperen op",
+  "No grouping": "Niet groeperen",
+  "Day": "Dag",
+  "City": "Stad",
+  "Unknown": "Onbekend",
 };

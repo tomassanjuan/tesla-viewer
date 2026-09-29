@@ -1,6 +1,6 @@
-import { groupFiles, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, eventType, countBy, filterEvents } from './library.js';
+import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
-import { parseClip } from './mp4.js';
+import { parseClip, hasSei } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { init as initBlur } from './blur.js';
@@ -34,7 +34,7 @@ async function addFiles(list) {
     try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
-  for (const e of events) if (e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); } catch { /* bad json: ignore */ } }
+  for (const e of events) if (e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
   filter.category = ''; filter.type = '';
   renderEvents();
   updateCryptUi();
@@ -42,6 +42,7 @@ async function addFiles(list) {
 }
 
 const filter = { category: '', type: '' };
+let groupBy = 'day';
 const visibleEvents = () => filterEvents(events, filter);
 
 function renderFilters() {
@@ -61,32 +62,20 @@ function renderFilters() {
   for (const k of EVENT_TYPES) if (byType[k]) sel.add(new Option(`${TYPE_LABEL[k]} (${byType[k]})`, k));
   if (!byType[filter.type]) filter.type = '';
   sel.value = filter.type; sel.hidden = !events.length;
+  $('groupby').hidden = !events.length;
 }
 document.addEventListener('langchange', () => events.length && renderEvents());
+$('groupby').onchange = (e) => { groupBy = e.target.value; renderEvents(); };
 $('evtype').onchange = (e) => { filter.type = e.target.value; renderEvents(); };
-
-const dayLabel = (d) => {
-  const n = new Date(), k = (x) => x.toDateString();
-  if (k(d) === k(n)) return 'Today';
-  if (k(d) === k(new Date(n.getTime() - 864e5))) return 'Yesterday';
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-};
 
 const thumbUrls = [];
 function renderEvents() {
   renderFilters();
-  if (!document.getElementById('grp-css')) document.head.append(Object.assign(document.createElement('style'), { id: 'grp-css',
-    textContent: '.grp-h{margin:12px 4px 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#8b93a1}.grp-h:first-child{margin-top:0}' }));
   $('events').innerHTML = '';
   for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
   const shown = visibleEvents();
   if (events.length && !shown.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = t('No events match this filter.'); $('events').append(p); }
-  let day = null;
-  for (const e of shown) {
-    if (e.day !== day) {
-      day = e.day;
-      const h = document.createElement('div'); h.className = 'grp-h'; h.textContent = dayLabel(e.start); $('events').append(h);
-    }
+  const renderOne = (e, into) => {
     const d = document.createElement('div'); d.className = 'ev'; d.tabIndex = 0; d.setAttribute('role', 'listitem');
     const nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
     d.innerHTML = `<b></b><span class="when">${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
@@ -101,8 +90,39 @@ function renderEvents() {
     }
     d.onclick = () => openEvent(e);
     d.onkeydown = (k) => { if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); openEvent(e); } };
-    e._el = d; $('events').append(d);
+    e._el = d; into.append(d);
+    watchTelemetry(e, d);
+  };
+  for (const g of groupEvents(shown, groupBy)) {
+    let into = $('events');
+    if (groupBy !== 'none') {
+      const h = document.createElement('h3'); h.className = 'evgroup'; h.textContent = groupBy === 'city' && !g.key ? t('Unknown') : g.key;
+      const w = document.createElement('div'); w.className = 'evgroup-list'; w.setAttribute('role', 'group'); w.setAttribute('aria-label', h.textContent);
+      $('events').append(h, w); into = w;
+    }
+    g.events.forEach((e) => renderOne(e, into));
   }
+}
+
+// Telemetry hint: probe the head of the first front clip once an event scrolls into view; result cached on the event.
+const teleObs = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((es) => {
+  for (const x of es) if (x.isIntersecting) { teleObs.unobserve(x.target); probeTelemetry(x.target._ev, x.target); }
+});
+function watchTelemetry(e, el) {
+  if (e.telemetry !== undefined) return showTelemetry(e, el);
+  el._ev = e; teleObs ? teleObs.observe(el) : probeTelemetry(e, el);
+}
+function showTelemetry(e, el) {
+  if (!e.telemetry || el.querySelector('.tele')) return;
+  const s = Object.assign(document.createElement('span'), { className: 'tele', textContent: t('Telemetry'), title: t('Telemetry available') });
+  el.querySelector('.badge').before(s);
+}
+async function probeTelemetry(e, el) {
+  const f = e.segments[0].cams.front ?? Object.values(e.segments[0].cams)[0];
+  if (e.telemetry === undefined && f && !(encrypted.has(f) && !decrypted.has(f))) {
+    try { e.telemetry = hasSei(await resolve(f).slice(0, 262144).arrayBuffer()) === true; } catch { e.telemetry = false; }
+  }
+  showTelemetry(e, el);
 }
 
 // ---------- clip parsing (worker, main-thread fallback) ----------
