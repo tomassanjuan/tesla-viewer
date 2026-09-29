@@ -1,4 +1,5 @@
 // Map panel: offline canvas track by default; optional OpenStreetMap tiles (opt-in).
+import { t } from './i18n.js';
 const TS = 256;
 
 // Web Mercator: lat/lon -> world pixel coords at zoom z (256px tiles).
@@ -51,7 +52,7 @@ export function createMap(canvas) {
     const W = canvas.width, H = canvas.height;
     x.clearRect(0, 0, W, H);
     const pts = (points || []).filter((s) => s.lat || s.lon);
-    if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText('No GPS', 10, 20); return; }
+    if (!pts.length) { x.fillStyle = '#8b93a1'; x.fillText(t('No GPS'), 10, 20); return; }
     let P;
     if (tiles) {
       const b = bounds(pts), clat = (b.minLat + b.maxLat) / 2, clon = (b.minLon + b.maxLon) / 2;

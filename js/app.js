@@ -3,6 +3,7 @@ import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { createMap } from './map.js';
+import { t } from './i18n.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,7 +36,7 @@ function renderEvents() {
   for (const e of events) {
     const d = document.createElement('div'); d.className = 'ev';
     const first = tsToDate(e.segments[0].ts);
-    d.innerHTML = `<b>${e.name}</b><small>${first.toLocaleString()} · ${e.segments.length} min-clips</small>`;
+    d.innerHTML = `<b>${e.name}</b><small>${first.toLocaleString()} · ${t('{n} min-clips', { n: e.segments.length })}</small>`;
     d.onclick = () => openEvent(e);
     e._el = d; $('events').append(d);
   }
@@ -69,8 +70,8 @@ async function openEvent(e) {
   $('empty').hidden = true;
   $('hud').hidden = !samples.length;
   drawGraph(); drawMap(0);
-  $('status').textContent = hevc ? 'HEVC clip: video plays if your browser supports it; telemetry not decoded yet' : '';
-  if (blocked) $('cryptMsg').textContent = `${blocked} segment(s) are encrypted; open "Encrypted clips" to decrypt.`;
+  $('status').textContent = hevc ? t('HEVC clip: video plays if your browser supports it; telemetry not decoded yet') : '';
+  if (blocked) $('cryptMsg').textContent = t('{n} segment(s) are encrypted; open "Encrypted clips" to decrypt.', { n: blocked });
   await loadSeg(0, 0);
 }
 
@@ -89,7 +90,7 @@ function buildGrid() {
   g.style.gridTemplateRows = `repeat(${Math.ceil(n / cols)},1fr)`;
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
-    d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
+    d.innerHTML = `<video muted playsinline preload="auto"></video><span>${t(NAMES[c])}</span>`;
     d.onclick = () => { focusCam = c; applyLayout(); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
   }
@@ -161,35 +162,35 @@ function sampleAt(t) {
 }
 
 function updateUi() {
-  const t = globalTime();
-  $('seek').value = ev.total ? (t / ev.total) * 1000 : 0;
-  $('time').textContent = `${fmt(t)} / ${fmt(ev.total)}`;
-  const m = sampleAt(t);
+  const tm = globalTime();
+  $('seek').value = ev.total ? (tm / ev.total) * 1000 : 0;
+  $('time').textContent = `${fmt(tm)} / ${fmt(ev.total)}`;
+  const m = sampleAt(tm);
   if (m) {
     const kmh = m.speedMps * 3.6, mph = m.speedMps * 2.23694, u = $('units').value;
     $('hud').innerHTML =
       `<div><span class="spd">${Math.round(u === 'kmh' ? kmh : mph)}</span> <span class="k">${u === 'kmh' ? 'km/h' : 'mph'}</span></div>` +
-      `<div><span class="k">GEAR</span> ${GEAR[m.gear] ?? '?'}</div>` +
-      `<div><span class="k">STEER</span> ${m.steering.toFixed(0)}°</div>` +
-      `<div><span class="k">THROTTLE</span> ${(m.accel * 100).toFixed(0)}%</div>` +
-      `<div class="${m.brake ? 'on-brake' : ''}"><span class="k">BRAKE</span> ${m.brake ? 'ON' : '–'}</div>` +
+      `<div><span class="k">${t('GEAR')}</span> ${GEAR[m.gear] ?? '?'}</div>` +
+      `<div><span class="k">${t('STEER')}</span> ${m.steering.toFixed(0)}°</div>` +
+      `<div><span class="k">${t('THROTTLE')}</span> ${(m.accel * 100).toFixed(0)}%</div>` +
+      `<div class="${m.brake ? 'on-brake' : ''}"><span class="k">${t('BRAKE')}</span> ${m.brake ? t('ON') : '–'}</div>` +
       `<div class="on-b">${m.blinkerLeft ? '◀' : ''}${m.blinkerRight ? '▶' : ''}</div>` +
-      `<div class="ap">${m.autopilot ? AUTOPILOT[m.autopilot] : ''}</div>` +
+      `<div class="ap">${m.autopilot ? t(AUTOPILOT[m.autopilot]) : ''}</div>` +
       `<div><span class="k">G</span> ${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)}</div>`;
   }
-  drawGraph(t); drawMap(t);
+  drawGraph(tm); drawMap(tm);
 }
 
-function drawGraph(t = 0) {
+function drawGraph(tm = 0) {
   const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
   x.clearRect(0, 0, W, H);
-  if (!ev?.samples.length) { x.fillStyle = '#8b93a1'; x.fillText('No telemetry in these clips', 10, 20); return; }
+  if (!ev?.samples.length) { x.fillStyle = '#8b93a1'; x.fillText(t('No telemetry in these clips'), 10, 20); return; }
   const max = Math.max(1, ...ev.samples.map((s) => s.speedMps * 3.6));
   x.strokeStyle = '#5aa9ff'; x.beginPath();
   ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
   x.stroke();
-  x.strokeStyle = '#e31937'; x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
-  x.fillStyle = '#8b93a1'; x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
+  x.strokeStyle = '#e31937'; x.beginPath(); x.moveTo((tm / ev.total) * W, 0); x.lineTo((tm / ev.total) * W, H); x.stroke();
+  x.fillStyle = '#8b93a1'; x.fillText(t('speed, max {n} km/h', { n: max.toFixed(0) }), 6, 12);
 }
 
 function drawMap(t) {
@@ -199,7 +200,7 @@ function drawMap(t) {
 // ---------- encryption ----------
 function updateCryptUi() {
   const n = [...encrypted.keys()].filter((f) => !decrypted.has(f)).length;
-  $('cryptCount').textContent = encrypted.size ? `${n} of ${encrypted.size} encrypted clips still locked.` : 'No encrypted clips loaded.';
+  $('cryptCount').textContent = encrypted.size ? t('{n} of {total} encrypted clips still locked.', { n, total: encrypted.size }) : t('No encrypted clips loaded.');
   if (n) $('crypt').open = true;
 }
 
@@ -212,10 +213,10 @@ async function decryptAll(keys) {
     try {
       const out = await decrypt(new Uint8Array(await f.arrayBuffer()), key);
       decrypted.set(f, new Blob([out], { type: 'video/mp4' })); ok++;
-      $('cryptMsg').textContent = `Decrypted ${ok}…`;
-    } catch (e) { $('cryptMsg').textContent = 'Decrypt failed: ' + e.message; }
+      $('cryptMsg').textContent = t('Decrypted {n}…', { n: ok });
+    } catch (e) { $('cryptMsg').textContent = t('Decrypt failed: {msg}', { msg: e.message }); }
   }
-  $('cryptMsg').textContent = `Decrypted ${ok}, no key for ${missing}.`;
+  $('cryptMsg').textContent = t('Decrypted {ok}, no key for {missing}.', { ok, missing });
   updateCryptUi();
   if (ok && ev) openEvent(ev.e);
 }
@@ -223,11 +224,11 @@ async function decryptAll(keys) {
 $('fetchKeys').onclick = async () => {
   try {
     const hs = [...encrypted.entries()].filter(([f]) => !decrypted.has(f)).map(([, h]) => h);
-    $('cryptMsg').textContent = 'Requesting keys…';
+    $('cryptMsg').textContent = t('Requesting keys…');
     await decryptAll(await fetchKeys(hs, $('token').value.trim()));
-  } catch (e) { $('cryptMsg').textContent = `${e.message}. If this is a CORS/network error, fetch keys another way and paste them as JSON.`; }
+  } catch (e) { $('cryptMsg').textContent = t('{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.', { msg: e.message }); }
 };
-$('useKeys').onclick = () => { try { decryptAll(parseKeyJson($('keyJson').value)); } catch (e) { $('cryptMsg').textContent = 'Bad JSON: ' + e.message; } };
+$('useKeys').onclick = () => { try { decryptAll(parseKeyJson($('keyJson').value)); } catch (e) { $('cryptMsg').textContent = t('Bad JSON: {msg}', { msg: e.message }); } };
 
 // ---------- wiring ----------
 $('pickDir').onchange = (e) => addFiles(e.target.files);
