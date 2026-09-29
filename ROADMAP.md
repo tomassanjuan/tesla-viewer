@@ -20,7 +20,7 @@ Goal: a free, fully on-device alternative to tesclip.com. Static site, no backen
 - [x] **P4 Encryption (experimental)**: detect encrypted containers, parse header, on-device AES decrypt (WebCrypto + JS MD5),
       keys via user-provided Tesla token or pasted key JSON. Header layout and IV scheme come from third-party reverse
       engineering and are unverified against real clips here.
-- [ ] **P5 Export**: trim + export MP4 with HUD (WebCodecs + mp4 muxer), multi-camera grid export.
+- [x] **P5 Export**: set in/out, export grid or focused cam with optional HUD via canvas.captureStream + MediaRecorder (mp4 if supported, else webm; real-time, js/export.js). WebCodecs faster-than-realtime muxing is a possible upgrade.
 - [ ] **P6 Map tiles** (opt-in, off by default to stay fully offline), reverse-geocode-free location display.
 - [ ] **P7 Polish**: HEVC clips (SEI proto mismatch, dashcam#14), PWA/offline install, keyboard map, i18n, license-plate blur.
 - [ ] **P8 Verify encryption** against real clips; CORS-free key flow (browser extension or paste flow) if Tesla blocks cross-origin.
