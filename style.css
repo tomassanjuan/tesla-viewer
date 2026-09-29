@@ -89,6 +89,8 @@ summary em{color:var(--warn);font-style:normal;font-size:11px}
 details label{font-size:12px;color:var(--mut);margin:var(--s3) 0 var(--s2)}
 details .btn{width:100%;justify-content:center}
 #extras-side{display:flex;flex-direction:column;gap:var(--s3);margin-top:var(--s2)}
+.ver{margin-top:auto;padding-top:var(--s3);color:var(--mut);font-size:12px;text-decoration:none}
+.ver:hover{color:var(--accent);text-decoration:underline}
 #extras-side:empty,#extras-dock:empty,#extras-panels:empty{display:none}
 
 /* ---------- main / stage ---------- */
