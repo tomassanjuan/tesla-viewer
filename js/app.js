@@ -3,6 +3,7 @@ import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
 import { createMap } from './map.js';
+import { createGraph } from './graph.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
 
 const $ = (id) => document.getElementById(id);
@@ -10,6 +11,7 @@ const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(
 const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repeater: 'Right', left_pillar: 'L pillar', right_pillar: 'R pillar' };
 
 const map = createMap($('map'));
+const graph = createGraph($('graph'), { seek: (t) => ev && seekGlobal(t) });
 $('tiles').onchange = (e) => map.setTiles(e.target.checked);
 let events = [], ev = null, focusCam = 'front';
 const decrypted = new Map();     // original File -> decrypted Blob
@@ -180,17 +182,7 @@ function updateUi() {
   drawGraph(t); drawMap(t);
 }
 
-function drawGraph(t = 0) {
-  const c = $('graph'), x = c.getContext('2d'), W = c.width, H = c.height;
-  x.clearRect(0, 0, W, H);
-  if (!ev?.samples.length) { x.fillStyle = '#8b93a1'; x.fillText('No telemetry in these clips', 10, 20); return; }
-  const max = Math.max(1, ...ev.samples.map((s) => s.speedMps * 3.6));
-  x.strokeStyle = '#5aa9ff'; x.beginPath();
-  ev.samples.forEach((s, i) => { const px = (s.t / ev.total) * W, py = H - (s.speedMps * 3.6 / max) * (H - 10) - 5; i ? x.lineTo(px, py) : x.moveTo(px, py); });
-  x.stroke();
-  x.strokeStyle = '#e31937'; x.beginPath(); x.moveTo((t / ev.total) * W, 0); x.lineTo((t / ev.total) * W, H); x.stroke();
-  x.fillStyle = '#8b93a1'; x.fillText(`speed, max ${max.toFixed(0)} km/h`, 6, 12);
-}
+function drawGraph(t = 0) { graph.update(ev, t); }
 
 function drawMap(t) {
   map.update(ev?.samples.filter((s) => s.lat || s.lon) ?? [], sampleAt(t));
