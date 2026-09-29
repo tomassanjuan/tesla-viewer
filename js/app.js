@@ -2,6 +2,7 @@ import { groupFiles, tsToDate, CAMS } from './library.js';
 import { parseClip } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { initExport } from './export.js';
+import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
 import { isEncrypted, parseHeader, decrypt, fetchKeys, parseKeyJson } from './tesla-crypto.js';
 
@@ -267,5 +268,6 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === '.') $('stepF').click(); else if (e.key === ',') $('stepB').click();
   else if (e.key === 'ArrowRight') ev && seekGlobal(globalTime() + 5); else if (e.key === 'ArrowLeft') ev && seekGlobal(globalTime() - 5);
 });
+initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
 initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });

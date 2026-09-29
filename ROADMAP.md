@@ -22,7 +22,7 @@ Goal: a free, fully on-device alternative to tesclip.com. Static site, no backen
       engineering and are unverified against real clips here.
 - [x] **P5 Export**: set in/out, export grid or focused cam with optional HUD via canvas.captureStream + MediaRecorder (mp4 if supported, else webm; real-time, js/export.js). WebCodecs faster-than-realtime muxing is a possible upgrade.
 - [x] **P6 Map tiles** (opt-in, off by default to stay fully offline), reverse-geocode-free location display.
-- [~] **P7 Polish**: done: PWA/offline install (manifest, sw.js cache-first, icon), HEVC clips detected + non-crashing status (SEI decode still open, dashcam#14), `?` shortcut help, aria-labels. Open: HEVC SEI decode, i18n, license-plate blur.
+- [~] **P7 Polish**: done: PWA/offline install (manifest, sw.js cache-first, icon), HEVC clips detected + non-crashing status (SEI decode still open, dashcam#14), `?` shortcut help, aria-labels. Open: HEVC SEI decode, i18n, license-plate blur: manual privacy blur shipped (js/blur.js: drag regions per camera, time windows, burned into exports); auto-detect not shipped (experimental TextDetector button only where the browser has it).
 - [ ] **P8 Verify encryption** against real clips; CORS-free key flow (browser extension or paste flow) if Tesla blocks cross-origin.
 
 ## Non-goals
