@@ -14,6 +14,7 @@ export const TICKS = {
   turn: { color: '#a78bfa', label: 'Sharp turn' },
   'ap-on': { color: '#5aa9ff', label: 'Autopilot engaged' },
   'ap-off': { color: '#8b93a1', label: 'Autopilot disengaged' },
+  trigger: { color: '#ff5cf0', label: 'Event trigger' }, // clip's own event.json reason at its trigger time (e.g. automatic emergency braking)
 };
 
 // Turn indicators: one definition (color, label, arrow path in a 24x24 box) for the HUD icons, timeline lane, tooltips and legend.

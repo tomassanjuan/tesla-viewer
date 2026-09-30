@@ -16,8 +16,8 @@ export function haversine(a, b) {
 function smooth(sm, f, w) {
   const out = [];
   for (let i = 0, lo = 0, hi = 0, sum = 0; i < sm.length; i++) {
-    for (; hi < sm.length && sm[hi].t <= sm[i].t + w; hi++) sum += f(sm[hi]);
-    for (; sm[lo].t < sm[i].t - w; lo++) sum -= f(sm[lo]);
+    for (; hi < sm.length && sm[hi].t <= sm[i].t + w; hi++) sum += f(sm[hi], hi);
+    for (; sm[lo].t < sm[i].t - w; lo++) sum -= f(sm[lo], lo);
     out.push(sum / (hi - lo));
   }
   return out;
@@ -59,11 +59,59 @@ export function signalSpans(samples, mergeGap = 1) {
   return out.sort((a, b) => a.start - b.start);
 }
 
+/** d(speed)/dt (m/s²) at each sample, over a centred ~1 s window: the ground truth for longitudinal acceleration. */
+export function speedAccel(sm) {
+  const out = [];
+  for (let i = 0, lo = 0, hi = 0; i < sm.length; i++) { // centred window, so it lines up with the sensor sample at i
+    while (hi < sm.length - 1 && sm[hi].t < sm[i].t + 0.5) hi++;
+    while (lo < i && sm[lo].t < sm[i].t - 0.5) lo++;
+    const dt = sm[hi].t - sm[lo].t;
+    out.push(dt > 0.5 ? ((sm[hi].speedMps || 0) - (sm[lo].speedMps || 0)) / dt : 0);
+  }
+  return out;
+}
+
+const corr = (a, b) => {
+  const n = a.length, ma = a.reduce((x, y) => x + y, 0) / n, mb = b.reduce((x, y) => x + y, 0) / n;
+  let sab = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < n; i++) { sab += (a[i] - ma) * (b[i] - mb); saa += (a[i] - ma) ** 2; sbb += (b[i] - mb) ** 2; }
+  return saa && sbb ? sab / Math.sqrt(saa * sbb) : 0;
+};
+
+/**
+ * Which SEI axis is the car's longitudinal one? Correlate d(speed)/dt with ax and ay and take the stronger; `sign` makes
+ * "forward = speeding up" positive. null when the trip has too little speed change to tell (then ax is assumed, sign +1).
+ */
+export function calibrateAccel(samples) {
+  const sm = samples.filter((s) => Number.isFinite(s?.t)).sort((a, b) => a.t - b.t);
+  if (sm.length < 30) return null;
+  const dv = speedAccel(sm), mean = dv.reduce((x, y) => x + y, 0) / dv.length;
+  if (Math.sqrt(dv.reduce((x, y) => x + (y - mean) ** 2, 0) / dv.length) < 0.3) return null;
+  const [rx, ry] = [corr(dv, sm.map((s) => s.ax || 0)), corr(dv, sm.map((s) => s.ay || 0))];
+  const key = Math.abs(ry) > Math.abs(rx) ? 'ay' : 'ax', r = key === 'ay' ? ry : rx;
+  return Math.abs(r) < 0.5 ? null : { key, sign: Math.sign(r), r };
+}
+
+/** Sets s.gLon (forward positive) and s.gLat (the other axis, raw sign) in m/s² on every sample; returns the calibration used. */
+export function applyAccel(samples) {
+  const cal = calibrateAccel(samples), lon = cal?.key ?? 'ax', lat = lon === 'ax' ? 'ay' : 'ax', sign = cal?.sign ?? 1;
+  for (const s of samples) { s.gLon = sign * (s[lon] || 0); s.gLat = s[lat] || 0; }
+  return cal;
+}
+
+/** Global timeline second of a wall-clock instant (ms) inside the trip's segments, or null before the first / without segments. */
+export function triggerTime(segs, ms) {
+  if (!Number.isFinite(ms) || !segs?.length || ms < segs[0].wall) return null;
+  const k = Math.max(0, segs.findLastIndex((s) => s.wall <= ms)), s = segs[k];
+  return s.start + Math.min(s.dur, (ms - s.wall) / 1000);
+}
+
 export function analyze(samples, opt = {}) {
   const o = { ...DEFAULTS, ...opt };
   const sm = (samples ?? []).filter((s) => Number.isFinite(s?.t)).sort((a, b) => a.t - b.t);
-  const res = { duration: 0, distanceM: 0, maxSpeedMps: 0, avgSpeedMps: 0, autopilotPct: 0, hardBraking: 0, hardAccel: 0, sharpTurns: 0, apEngages: 0, apDisengages: 0, markers: [], signals: [] };
+  const res = { duration: 0, distanceM: 0, maxSpeedMps: 0, avgSpeedMps: 0, autopilotPct: 0, hardBraking: 0, hardAccel: 0, sharpTurns: 0, apEngages: 0, apDisengages: 0, markers: [], signals: [], accel: null };
   if (!sm.length) return res;
+  res.accel = applyAccel(sm);
   res.duration = sm[sm.length - 1].t - sm[0].t;
   let spdSum = 0, apTime = 0, last = null;
   for (let i = 0; i < sm.length; i++) {
@@ -89,10 +137,12 @@ export function analyze(samples, opt = {}) {
   res.avgSpeedMps = spdSum / sm.length;
   res.autopilotPct = res.duration > 0 ? (apTime / res.duration) * 100 : 0;
   // ax: longitudinal accel (m/s2), negative = braking; ay: lateral.
-  const d = { minDur: o.minDurS, minGap: o.minGapS };
+  const speedAcc = speedAccel(sm), d = { minDur: o.minDurS, minGap: o.minGapS };
   const add = (evs, kind, label, note) => { for (const e of evs) res.markers.push({ t: e.t, kind, label: `${label} ${e.v.toFixed(1)} m/s²`, v: e.v, note: note(e) }); return evs.length; };
-  const sx = smooth(sm, (s) => s.ax || 0, o.smoothS), sy = smooth(sm, (s) => Math.abs(s.ay || 0), o.smoothS);
-  res.hardBraking = add(detect(sm, sx.map((v) => -v), o.brakeMps2, d, (r) => r.flag || r.v >= o.brakeStrongMps2), 'brake', 'Hard braking', (e) => (e.flag ? 'brake pedal' : 'no brake pedal'));
+  // braking counts the stronger of the accelerometer and d(speed)/dt, so a wrongly mapped axis cannot hide an emergency stop
+  const sx = smooth(sm, (s) => s.gLon, o.smoothS), sy = smooth(sm, (s) => Math.abs(s.gLat), o.smoothS), sd = smooth(sm, (_, i) => speedAcc[i], o.smoothS);
+  const dec = sx.map((v, i) => Math.max(-v, -sd[i]));
+  res.hardBraking = add(detect(sm, dec, o.brakeMps2, d, (r) => r.flag || r.v >= o.brakeStrongMps2), 'brake', 'Hard braking', (e) => (e.flag ? 'brake pedal' : 'automatic braking'));
   res.hardAccel = add(detect(sm, sx, o.accelMps2, d, (r) => r.s.accel > 0), 'accel', 'Hard acceleration', (e) => `throttle ${Math.round(Math.min(1, e.s.accel || 0) * 100)}%`);
   res.sharpTurns = add(detect(sm, sy, o.turnMps2, d), 'turn', 'Sharp turn', (e) => `steering ${Math.round(e.s.steering || 0)}°`);
   res.markers.sort((a, b) => a.t - b.t);
@@ -103,7 +153,7 @@ export function analyze(samples, opt = {}) {
 /** Tooltip text: "<category> <peak> · <why> · m:ss"; the note says what backs the event (brake pedal, throttle, steering). */
 export function tickText(m) {
   const s = Math.max(0, Math.round(m.t));
-  return `${t(TICKS[m.kind]?.label ?? m.label)}${m.v ? ` ${m.v.toFixed(1)} m/s²` : ''}${m.note ? ` · ${t(m.note)}` : ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${t(m.kind === 'trigger' ? m.label : TICKS[m.kind]?.label ?? m.label)}${m.v ? ` ${m.v.toFixed(1)} m/s²` : ''}${m.note ? ` · ${t(m.note)}` : ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 const mss = (x) => { const s = Math.max(0, Math.round(x)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -117,7 +167,8 @@ export function formatSummary(r, units = 'kmh') {
   const m = Math.floor(r.duration / 60), s = Math.round(r.duration % 60);
   return [['Distance', dist], ['Duration', `${m}:${String(s).padStart(2, '0')}`], ['Max speed', sp(r.maxSpeedMps)], ['Avg speed', sp(r.avgSpeedMps)],
     ['Autopilot', `${r.autopilotPct.toFixed(0)}%`], ['Hard braking', String(r.hardBraking)], ['Hard accel', String(r.hardAccel)], ['Sharp turns', String(r.sharpTurns)],
-    ['AP on / off', `${r.apEngages} / ${r.apDisengages}`]];
+    ['AP on / off', `${r.apEngages} / ${r.apDisengages}`],
+    ['G source', r.accel ? `${r.accel.key === 'ax' ? 'ax' : 'ay'}${r.accel.sign < 0 ? ' (inverted)' : ''}, r ${r.accel.r.toFixed(2)}` : 'assumed ax']];
 }
 
 // ---------- DOM hook (browser only) ----------
@@ -163,7 +214,8 @@ export function init(ctx) {
       b.onclick = () => { ctx.seek(g.start); showTip(`${((g.start + g.end) / 2 / ev.total) * 100}%`, text); };
       ticks.append(b);
     }
-    for (const m of r.markers) {
+    const markers = ev.trigger ? [...r.markers, ev.trigger] : r.markers;
+    for (const m of markers) {
       const b = document.createElement('button'), text = tickText(m);
       b.className = `ins-tick ${m.kind}`; b.title = text; b.setAttribute('aria-label', text);
       b.style.left = `${(m.t / ev.total) * 100}%`;
