@@ -26,6 +26,7 @@ const KEYS = [
   'MediaRecorder has no mp4/webm support in this browser', 'in {a}s · out {b}s',
   'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'Person or object detected', 'Motion detected', 'Saved by you', 'Honk', 'Emergency braking', 'Collision', 'No events match this filter.',
   'Telemetry', 'Telemetry available', 'Group by', 'No grouping', 'Day', 'City', 'Unknown',
+  'Month', 'Type', 'Kind', 'Cameras', 'Length', 'Trips', 'Events', 'No type', 'Sort by', 'Newest', 'Oldest', 'Longest', 'Shortest', 'Most cams', '{n} cams',
   'Dashboard', 'None', 'Telemetry only, no cameras',
 ];
 export default Object.fromEntries(KEYS.map((k) => [k, k]));

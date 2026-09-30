@@ -1,4 +1,4 @@
-import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
+import { groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
 import { parseClip, probeSei } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
@@ -52,8 +52,11 @@ async function addFiles(list) {
 }
 
 const filter = { category: '', type: '' };
-let groupBy = 'day';
-const visibleEvents = () => filterEvents(events, filter);
+const pref = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch { return d; } };
+const savePref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode: not persisted */ } };
+let groupBy = pref('groupBy', GROUPS, 'day'), sortBy = pref('sortBy', SORTS, 'newest');
+const collapsed = new Set();   // `${groupBy}:${key}` of collapsed group headers (session only)
+const visibleEvents = () => sortEvents(filterEvents(events, filter), sortBy);
 
 function renderFilters() {
   const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
@@ -77,10 +80,11 @@ function renderFilters() {
     b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
     tbox.append(b);
   }
-  $('groupby').hidden = !events.length;
+  $('libctl').hidden = !events.length;
 }
 document.addEventListener('langchange', () => events.length && renderEvents());
-$('groupby').onchange = (e) => { groupBy = e.target.value; renderEvents(); };
+$('groupby').onchange = (e) => { groupBy = e.target.value; savePref('groupBy', groupBy); renderEvents(); };
+$('sortby').onchange = (e) => { sortBy = e.target.value; savePref('sortBy', sortBy); renderEvents(); };
 
 const thumbUrls = [];
 function renderEvents() {
@@ -108,11 +112,25 @@ function renderEvents() {
     e._el = d; into.append(d);
     watchTelemetry(e, d);
   };
+  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), saved: t('Saved by you') };
+  const groupLabel = (k) => ({
+    day: k, month: k, city: k || t('Unknown'),
+    type: TYPE_LABEL[k] ?? (k ? k.slice(RAW_PREFIX.length) : t('No type')),
+    kind: k === 'trip' ? t('Trips') : t('Events'),
+    cams: t('{n} cams', { n: k }),
+    length: k === '<2' ? '< 2 min' : k === '10+' ? '10+ min' : `${k.replace('-', '–')} min`,
+  }[groupBy]);
   for (const g of groupEvents(shown, groupBy)) {
     let into = $('events');
     if (groupBy !== 'none') {
-      const h = document.createElement('h3'); h.className = 'evgroup'; h.textContent = groupBy === 'city' && !g.key ? t('Unknown') : g.key;
-      const w = document.createElement('div'); w.className = 'evgroup-list'; w.setAttribute('role', 'group'); w.setAttribute('aria-label', h.textContent);
+      const label = groupLabel(g.key), id = `${groupBy}:${g.key}`, closed = collapsed.has(id);
+      const h = document.createElement('h3'); h.className = 'evgroup';
+      const hb = document.createElement('button'); hb.type = 'button'; hb.setAttribute('aria-expanded', !closed);
+      const lb = Object.assign(document.createElement('span'), { className: 'lbl', textContent: label });
+      hb.append(Object.assign(document.createElement('span'), { className: 'chev', ariaHidden: 'true' }), lb, Object.assign(document.createElement('span'), { className: 'n', textContent: g.events.length }));
+      h.append(hb);
+      const w = document.createElement('div'); w.className = 'evgroup-list'; w.setAttribute('role', 'group'); w.setAttribute('aria-label', label); w.hidden = closed;
+      hb.onclick = () => { const c = !collapsed.has(id); c ? collapsed.add(id) : collapsed.delete(id); hb.setAttribute('aria-expanded', !c); w.hidden = c; };
       $('events').append(h, w); into = w;
     }
     g.events.forEach((e) => renderOne(e, into));
@@ -156,7 +174,8 @@ function parseOffThread(blob) {
 }
 
 // ---------- event / player ----------
-for (const id of ['groupby', 'speed', 'layout', 'units']) seg($(id));
+for (const id of ['groupby', 'sortby', 'speed', 'layout', 'units']) seg($(id));
+$('groupby').value = groupBy; $('sortby').value = sortBy;
 const vids = {};          // cam -> <video>
 let segIdx = 0, playing = false, wantPlay = false;
 let gapMode = 'skip', gapT = null, gapLast = 0; // 'skip' | 'through'; gapT = virtual global time while inside a gap

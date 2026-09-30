@@ -213,6 +213,17 @@ canvas{background:transparent}
 .ev small{grid-column:1/-1}
 .ev .tele{flex:none;white-space:nowrap;font-size:10px;font-weight:600;padding:0 5px;line-height:16px;border-radius:var(--r-pill);color:var(--accent);border:1px solid var(--accent)}
 .evgroup{font-size:12px;font-weight:600;color:var(--mut);margin:var(--s3) 0 var(--s2)}
+.evgroup button{font:inherit;color:inherit;background:none;border:0;padding:0;display:flex;align-items:center;gap:var(--s2);width:100%;text-align:left;cursor:pointer;min-height:28px;text-transform:none;letter-spacing:0}
+.evgroup button:hover{color:var(--fg)}
+.evgroup button:focus-visible{outline:none;box-shadow:var(--ring)}
+.evgroup .chev{width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .15s;flex:none;margin:0 2px 2px 1px}
+.evgroup [aria-expanded=false] .chev{transform:rotate(-45deg)}
+.evgroup .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.evgroup .n{font-weight:500;padding:0 6px;border-radius:var(--r-pill);background:var(--surface-2)}
+.ctl{display:grid;gap:var(--s1,4px);margin:var(--s2) 0}
+.ctl-l{font-size:11px;color:var(--mut);margin-top:var(--s1,4px)}
+.ctl .seg{display:flex;border-radius:var(--r-md,12px)}
+.ctl .seg button{flex:1 0 auto;padding:0 var(--s2)}
 .evgroup-list{display:grid;gap:var(--s2)}
 
 /* ---------- segmented button groups (replace selects) ---------- */

@@ -104,10 +104,36 @@ test('group by day / city / none', async ({ page }) => {
   const heads = page.locator('#events h3.evgroup');
   await expect(heads).toHaveCount(4);                 // default: one day each
   await setOpt(page, '#groupby', 'city');
-  await expect(heads).toHaveText(['Madrid', 'Paris', 'Unknown']);   // trip has no event.json city
+  await expect(heads).toHaveText(["Madrid2", "Paris1", "Unknown1"]);   // trip has no event.json city
   await setOpt(page, '#groupby', 'none');
   await expect(heads).toHaveCount(0);
   await expect(page.locator('#events .ev')).toHaveCount(4);
+});
+
+test('group by type / month and sort; choices persist across reloads; headers collapse', async ({ page }) => {
+  await load(page);
+  await setOpt(page, '#groupby', 'type');
+  await expect(page.locator('#events h3.evgroup').first()).toBeVisible();
+  const n = await page.locator('#events h3.evgroup').count();
+  expect(n).toBeGreaterThan(1);
+  await setOpt(page, '#groupby', 'month');
+  await expect(page.locator('#events h3.evgroup')).toHaveCount(1);
+  const head = page.locator('#events h3.evgroup button').first();
+  await expect(head).toHaveAttribute('aria-expanded', 'true');
+  await head.click();
+  await expect(head).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#events .ev:visible')).toHaveCount(0);
+  await head.click();
+  await expect(page.locator('#events .ev:visible')).toHaveCount(4);
+  await setOpt(page, '#sortby', 'oldest');
+  const first = await page.locator('#events .ev').first().innerText();
+  await setOpt(page, '#sortby', 'newest');
+  expect(await page.locator('#events .ev').first().innerText()).not.toBe(first);
+  await setOpt(page, '#sortby', 'oldest');
+  await page.reload();
+  await load(page);
+  expect(await optValue(page, '#groupby')).toBe('month');
+  expect(await optValue(page, '#sortby')).toBe('oldest');
 });
 
 test('telemetry badge: SEI clips (incl. a 3 MB moov) show it, clips without SEI do not', async ({ page }) => {
