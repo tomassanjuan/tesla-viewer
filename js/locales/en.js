@@ -8,7 +8,7 @@ const KEYS = [
   'Tesla bearer token', 'from dashcam.tesla.com', 'Fetch keys & decrypt', 'or paste key JSON', 'Decrypt with pasted keys',
   'Load a TeslaCam folder to begin',
   'Play/pause', 'Step back one frame', 'Step forward one frame', 'Seek', 'Playback speed', 'Layout', 'Grid', 'Focus', 'Speed units',
-  'Export telemetry as CSV', 'Set start', 'Set end', 'Export video', 'Download CSV', 'Burn in HUD', 'Export enlarged cam only', 'Edit blur', 'Exports only the camera you enlarged by clicking it', 'Click camera', 'Enlarge / restore (double-click: fullscreen)',
+  'Export telemetry as CSV', 'Set start', 'Set end', 'Export video', 'Download CSV', 'Burn in HUD', 'Show HUD', 'Export enlarged cam only', 'Edit blur', 'Exports only the camera you enlarged by clicking it', 'Click camera', 'Enlarge / restore (double-click: fullscreen)',
   'Telemetry graph', 'GPS track map', 'Click to enlarge',
   'Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server.',
   'Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)',

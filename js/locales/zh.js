@@ -102,6 +102,7 @@ export default {
   "Export video": "导出视频",
   "Download CSV": "下载 CSV",
   "Burn in HUD": "嵌入 HUD",
+  "Show HUD": "显示 HUD",
   "Export enlarged cam only": "仅导出放大的摄像头",
   "Edit blur": "编辑模糊",
 };

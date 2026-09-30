@@ -102,6 +102,7 @@ export default {
   "Export video": "Esporta video",
   "Download CSV": "Scarica CSV",
   "Burn in HUD": "Incorpora HUD",
+  "Show HUD": "Mostra HUD",
   "Export enlarged cam only": "Esporta solo la camera ingrandita",
   "Edit blur": "Modifica sfocatura",
 };

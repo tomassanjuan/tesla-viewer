@@ -102,6 +102,7 @@ export default {
   "Export video": "動画を書き出す",
   "Download CSV": "CSVをダウンロード",
   "Burn in HUD": "HUDを焼き込む",
+  "Show HUD": "HUDを表示",
   "Export enlarged cam only": "拡大したカメラのみ書き出す",
   "Edit blur": "ぼかしを編集",
 };
