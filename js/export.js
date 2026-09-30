@@ -57,7 +57,7 @@ function drawFrame(x, api, opt, W, H) {
   }
 }
 
-export async function exportRange(api, start, end, opt, onStatus = () => {}) {
+export async function exportRange(api, start, end, opt, onStatus = () => {}, onProgress = () => {}) {
   const pick = pickMime((t) => MediaRecorder.isTypeSupported(t));
   if (!pick) throw new Error(t('MediaRecorder has no mp4/webm support in this browser'));
   const W = 1280, H = 720, cv = Object.assign(document.createElement('canvas'), { width: W, height: H }), x = cv.getContext('2d');
@@ -75,6 +75,7 @@ export async function exportRange(api, start, end, opt, onStatus = () => {}) {
       const loop = () => {
         const tm = api.globalTime();
         drawFrame(x, api, opt, W, H);
+        onProgress(Math.max(0, Math.min(1, (tm - start) / (end - start))));
         onStatus(t('Exporting {pct}% ({n} segment(s))', { pct: Math.round(((tm - start) / (end - start)) * 100), n }));
         if (tm >= end || !api.playing()) return res();
         requestAnimationFrame(loop);
@@ -105,8 +106,9 @@ export function initExport(api) {
     const r = clampRange(inT ?? 0, outT ?? api.ev.total, api.ev.total);
     if (!r) return ($('trimInfo').textContent = t('Range too short'));
     $('export').disabled = true;
-    try { await exportRange(api, r.start, r.end, { hud: $('expHud').checked, focus: $('expFocus').checked }, (s) => ($('trimInfo').textContent = s)); }
+    const task = api.busy?.begin('Exporting video', 1);
+    try { await exportRange(api, r.start, r.end, { hud: $('expHud').checked, focus: $('expFocus').checked }, (s) => ($('trimInfo').textContent = s), (f) => task?.set(f)); }
     catch (e) { $('trimInfo').textContent = t('Export failed: {msg}', { msg: e.message }); }
-    $('export').disabled = false;
+    task?.end(); $('export').disabled = false;
   };
 }
