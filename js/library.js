@@ -14,15 +14,19 @@ const p2 = (n) => String(n).padStart(2, '0');
 const dayKey = (d) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 const dur = (n) => { const m = n; return m >= 60 ? `${Math.floor(m / 60)} h ${p2(m % 60)} min` : `${m} min`; };
 
-/** Split sorted segments where start - (prevStart + 60 s) > gapS. */
+export const REGULAR_GAP_MAX_S = 900; // a repeating gap up to this long (e.g. a clip every 5 min) does not split a group
+
+/** Split sorted segments where start - (prevStart + 60 s) > gapS, except gaps that repeat with a consistent length
+ *  (>= 2 within +-25 % of their median, median <= REGULAR_GAP_MAX_S): those keep the clips in one group. */
 function splitByGap(segs, gapS) {
+  const ts = segs.map((s) => tsToDate(s.ts).getTime());
+  const gaps = ts.map((t, i) => (i ? (t - ts[i - 1]) / 1000 - SEG_S : 0));
+  const big = gaps.filter((g) => g > gapS).sort((a, b) => a - b);
+  const med = big[big.length >> 1];
+  const regular = (g) => g > gapS && med <= REGULAR_GAP_MAX_S && Math.abs(g - med) <= med * 0.25;
+  const keep = big.filter(regular).length >= 2;
   const runs = [];
-  let prev = null;
-  for (const s of segs) {
-    const t = tsToDate(s.ts).getTime();
-    if (!prev || (t - prev) / 1000 - SEG_S > gapS) runs.push([]);
-    runs[runs.length - 1].push(s); prev = t;
-  }
+  segs.forEach((s, i) => { if (!i || (gaps[i] > gapS && !(keep && regular(gaps[i])))) runs.push([]); runs[runs.length - 1].push(s); });
   return runs;
 }
 
@@ -33,17 +37,19 @@ export function categoryOf(path) {
   return m ? m[2].toLowerCase() : 'loose';
 }
 
-export const EVENT_TYPES = ['sentry', 'saved', 'honk', 'other'];
-/** Event type from event.json `reason`; falls back to the folder when there is no event.json. null for continuous recording. */
+export const EVENT_TYPES = ['emergency_braking', 'collision', 'person', 'motion', 'honk', 'saved'];
+export const RAW_PREFIX = 'raw:';
+/** Event type from event.json `reason`: a known type, `raw:<reason>` for any other reason (shown under its own text), or null without a reason. */
 export function eventType(e) {
   const r = String(e.reason ?? '');
-  if (/^sentry/i.test(r)) return 'sentry';
+  if (/emergency_brak/i.test(r)) return 'emergency_braking';
+  if (/collision|crash|accident|airbag/i.test(r)) return 'collision';
+  if (/^sentry.*(object|person)/i.test(r)) return 'person';
+  if (/^sentry.*(motion|accelerometer)/i.test(r)) return 'motion';
   if (/honk/i.test(r)) return 'honk';
   if (/^user_interaction/i.test(r)) return 'saved';
-  if (r) return 'other';
-  return e.category === 'sentry' ? 'sentry' : e.category === 'saved' ? 'saved' : e.category === 'recent' ? null : 'other';
+  return r ? RAW_PREFIX + r : e.category === 'saved' ? 'saved' : null;
 }
-
 /** Counts per category / type over `events` (for badges). */
 export function countBy(events, fn) {
   const c = {};
@@ -94,6 +100,7 @@ const REASONS = {
   sentry_aware_object_detection: 'Sentry: object detected',
   user_interaction_dashcam_icon_tap: 'Saved: dashcam icon tap',
   user_interaction_dashcam_panel_save: 'Saved: dashcam panel',
+  vehicle_auto_emergency_braking: 'Emergency braking',
 };
 
 /** Parsed Tesla event.json -> { reason, place } display strings ('' when unknown). */

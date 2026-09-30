@@ -29,3 +29,14 @@ test('event dirs stay events; only >10 min gaps split', () => {
   assert.ok(ev.every((e) => e.kind === 'event'));
   assert.equal(ev.find((e) => e.name === '2026-06-01_10-00-00').segments.length, 2);
 });
+
+test('a consistent repeating gap keeps clips in one group; a lone or irregular gap still splits', () => {
+  const at = (m) => R(`2026-06-03_10-${String(m).padStart(2, '0')}-00`);
+  // clips every 5 min (4 min gaps, > 120 s threshold, repeated) -> one trip
+  assert.equal(groupFiles([0, 5, 10, 15, 20].map(at)).length, 1);
+  // one lone 4 min gap still splits
+  assert.equal(groupFiles([0, 1, 5, 6].map(at)).length, 2);
+  // repeating pattern, then an outlier gap far outside the cadence -> split there only
+  const ev = groupFiles([0, 5, 10, 15, 50, 55].map(at));
+  assert.deepEqual(ev.map((e) => e.segments.length).sort(), [2, 4]);
+});

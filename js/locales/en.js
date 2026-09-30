@@ -8,7 +8,7 @@ const KEYS = [
   'Tesla bearer token', 'from dashcam.tesla.com', 'Fetch keys & decrypt', 'or paste key JSON', 'Decrypt with pasted keys',
   'Load a TeslaCam folder to begin',
   'Play/pause', 'Step back one frame', 'Step forward one frame', 'Seek', 'Playback speed', 'Layout', 'Grid', 'Focus', 'Speed units',
-  'Export telemetry as CSV', 'Set in', 'Set out', 'Export', 'HUD', 'Enlarged cam only', 'Exports only the camera you enlarged by clicking it', 'Click camera', 'Enlarge / restore (double-click: fullscreen)',
+  'Export telemetry as CSV', 'Set start', 'Set end', 'Export video', 'Download CSV', 'Burn in HUD', 'Show HUD', 'Export enlarged cam only', 'Edit blur', 'Exports only the camera you enlarged by clicking it', 'Click camera', 'Enlarge / restore (double-click: fullscreen)',
   'Telemetry graph', 'GPS track map', 'Click to enlarge',
   'Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server.',
   'Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)',
@@ -22,9 +22,10 @@ const KEYS = [
   '{n} of {total} encrypted clips still locked.', 'No encrypted clips loaded.',
   'Decrypted {n}…', 'Decrypt failed: {msg}', 'Decrypted {ok}, no key for {missing}.', 'Requesting keys…',
   '{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.', 'Bad JSON: {msg}',
-  'No GPS', 'Range too short', 'Export failed: {msg}', 'Exporting {pct}% ({n} segment(s))', 'Exported {name}',
+  'No GPS', 'Driven', 'Ahead', 'Range too short', 'Export failed: {msg}', 'Exporting {pct}% ({n} segment(s))', 'Exported {name}',
   'MediaRecorder has no mp4/webm support in this browser', 'in {a}s · out {b}s',
-  'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'Sentry trigger', 'Saved by you', 'Honk', 'Other', 'No events match this filter.',
+  'All', 'Recent', 'Saved', 'Sentry', 'Loose clips', 'Person or object detected', 'Motion detected', 'Saved by you', 'Honk', 'Emergency braking', 'Collision', 'No events match this filter.',
   'Telemetry', 'Telemetry available', 'Group by', 'No grouping', 'Day', 'City', 'Unknown',
+  'Dashboard', 'None', 'Telemetry only, no cameras',
 ];
 export default Object.fromEntries(KEYS.map((k) => [k, k]));

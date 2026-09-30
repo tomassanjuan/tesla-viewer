@@ -127,9 +127,30 @@ test('categories and event-type filtering', async () => {
   evs.find((e) => e.name === '2026-06-02_10-00-00').reason = 'user_interaction_honk';
   assert.equal(eventType({ reason: 'user_interaction_dashcam_icon_tap' }), 'saved');
   assert.equal(filterEvents(evs, { type: 'honk' }).length, 1);
-  assert.equal(filterEvents(evs, { type: 'sentry' }).length, 2);
-  assert.equal(filterEvents(evs, { category: 'saved', type: 'sentry' }).length, 0);
+  assert.equal(filterEvents(evs, { type: 'person' }).length, 1);
+  assert.equal(eventType({ reason: 'sentry_accelerometer_motion' }), 'motion');
+  assert.equal(eventType({ reason: 'something_new' }), 'raw:something_new');
+  assert.equal(eventType({ reason: 'vehicle_auto_emergency_braking' }), 'emergency_braking');
+  assert.equal(eventType({ reason: 'sentry_collision_detected' }), 'collision');
+  assert.equal(eventType({ reason: 'user_interaction_honk' }), 'honk');
+  assert.equal(filterEvents(evs, { category: 'saved', type: 'person' }).length, 0);
   assert.equal(eventType(evs.find((e) => e.category === 'recent')), null);
+});
+
+test('event.json reasons map to their own type with counts; unknown reasons keep raw text', async () => {
+  const { eventType, countBy, filterEvents, formatEventInfo } = await import('../js/library.js');
+  const samples = [
+    { reason: 'vehicle_auto_emergency_braking', city: 'Oslo' },
+    { reason: 'sentry_aware_object_detection' },
+    { reason: 'user_interaction_dashcam_icon_tap' },
+    { reason: 'user_interaction_honk' },
+    { reason: 'sentry_collision_detected' },
+    { reason: 'brand_new_reason' },
+    { reason: 'brand_new_reason' },
+  ].map((j) => ({ ...j, category: 'sentry' }));
+  assert.deepEqual(countBy(samples, eventType), { emergency_braking: 1, person: 1, saved: 1, honk: 1, collision: 1, 'raw:brand_new_reason': 2 });
+  assert.equal(filterEvents(samples, { type: 'raw:brand_new_reason' }).length, 2);
+  assert.equal(formatEventInfo({ reason: 'vehicle_auto_emergency_braking' }).reason, 'Emergency braking');
 });
 
 test('groupEvents by day / city; formatEventInfo city', async () => {
@@ -152,4 +173,16 @@ test('hasSei: probes head for a Tesla SEI before the first slice', async () => {
   assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', cat(sei, slice))).buffer), true);
   assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', slice)).buffer), false);
   assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4))).buffer), null);
+});
+
+test('probeSei: finds mdat behind a large moov by reading box headers only', async () => {
+  const { probeSei } = await import('../js/mp4.js');
+  const box = (type, payload) => { const b = new Uint8Array(8 + payload.length); new DataView(b.buffer).setUint32(0, b.length); b.set([...type].map((c) => c.charCodeAt(0)), 4); b.set(payload, 8); return b; };
+  const nal = (bytes) => { const n = new Uint8Array(4 + bytes.length); new DataView(n.buffer).setUint32(0, bytes.length); n.set(bytes, 4); return n; };
+  const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let p = 0; for (const x of a) { o.set(x, p); p += x.length; } return o; };
+  const sei = nal([6, 5, 0x99, 0x42, 0x42, 0x69, 0x08, 0x96, 0x01, 0x80]), slice = nal([0x65, 0, 0, 0, 0]);
+  const mk = (mdat) => new Blob([cat(box('ftyp', new Uint8Array(4)), box('moov', new Uint8Array(400000)), box('mdat', mdat))]);
+  assert.equal(await probeSei(mk(cat(sei, slice))), true);
+  assert.equal(await probeSei(mk(slice)), false);
+  assert.equal(await probeSei(new Blob([box('ftyp', new Uint8Array(4))])), null);
 });
