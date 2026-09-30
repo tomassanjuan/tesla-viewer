@@ -128,9 +128,28 @@ test('categories and event-type filtering', async () => {
   assert.equal(filterEvents(evs, { type: 'honk' }).length, 1);
   assert.equal(filterEvents(evs, { type: 'person' }).length, 1);
   assert.equal(eventType({ reason: 'sentry_accelerometer_motion' }), 'motion');
-  assert.equal(eventType({ reason: 'something_new' }), null);
+  assert.equal(eventType({ reason: 'something_new' }), 'raw:something_new');
+  assert.equal(eventType({ reason: 'vehicle_auto_emergency_braking' }), 'emergency_braking');
+  assert.equal(eventType({ reason: 'sentry_collision_detected' }), 'collision');
+  assert.equal(eventType({ reason: 'user_interaction_honk' }), 'honk');
   assert.equal(filterEvents(evs, { category: 'saved', type: 'person' }).length, 0);
   assert.equal(eventType(evs.find((e) => e.category === 'recent')), null);
+});
+
+test('event.json reasons map to their own type with counts; unknown reasons keep raw text', async () => {
+  const { eventType, countBy, filterEvents, formatEventInfo } = await import('../js/library.js');
+  const samples = [
+    { reason: 'vehicle_auto_emergency_braking', city: 'Oslo' },
+    { reason: 'sentry_aware_object_detection' },
+    { reason: 'user_interaction_dashcam_icon_tap' },
+    { reason: 'user_interaction_honk' },
+    { reason: 'sentry_collision_detected' },
+    { reason: 'brand_new_reason' },
+    { reason: 'brand_new_reason' },
+  ].map((j) => ({ ...j, category: 'sentry' }));
+  assert.deepEqual(countBy(samples, eventType), { emergency_braking: 1, person: 1, saved: 1, honk: 1, collision: 1, 'raw:brand_new_reason': 2 });
+  assert.equal(filterEvents(samples, { type: 'raw:brand_new_reason' }).length, 2);
+  assert.equal(formatEventInfo({ reason: 'vehicle_auto_emergency_braking' }).reason, 'Emergency braking');
 });
 
 test('groupEvents by day / city; formatEventInfo city', async () => {

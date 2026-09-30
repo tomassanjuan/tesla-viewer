@@ -37,17 +37,19 @@ export function categoryOf(path) {
   return m ? m[2].toLowerCase() : 'loose';
 }
 
-export const EVENT_TYPES = ['person', 'motion', 'honk', 'saved'];
-/** Concrete event type from event.json `reason`, or null when it is not one of them (still listed under All). */
+export const EVENT_TYPES = ['emergency_braking', 'collision', 'person', 'motion', 'honk', 'saved'];
+export const RAW_PREFIX = 'raw:';
+/** Event type from event.json `reason`: a known type, `raw:<reason>` for any other reason (shown under its own text), or null without a reason. */
 export function eventType(e) {
   const r = String(e.reason ?? '');
+  if (/emergency_brak/i.test(r)) return 'emergency_braking';
+  if (/collision|crash|accident|airbag/i.test(r)) return 'collision';
   if (/^sentry.*(object|person)/i.test(r)) return 'person';
   if (/^sentry.*(motion|accelerometer)/i.test(r)) return 'motion';
   if (/honk/i.test(r)) return 'honk';
   if (/^user_interaction/i.test(r)) return 'saved';
-  return r ? null : e.category === 'saved' ? 'saved' : null; // no catch-all type: unknown reasons show only under All
+  return r ? RAW_PREFIX + r : e.category === 'saved' ? 'saved' : null;
 }
-
 /** Counts per category / type over `events` (for badges). */
 export function countBy(events, fn) {
   const c = {};
@@ -98,6 +100,7 @@ const REASONS = {
   sentry_aware_object_detection: 'Sentry: object detected',
   user_interaction_dashcam_icon_tap: 'Saved: dashcam icon tap',
   user_interaction_dashcam_panel_save: 'Saved: dashcam panel',
+  vehicle_auto_emergency_braking: 'Emergency braking',
 };
 
 /** Parsed Tesla event.json -> { reason, place } display strings ('' when unknown). */

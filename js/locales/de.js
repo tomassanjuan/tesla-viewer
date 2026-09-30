@@ -79,6 +79,8 @@ export default {
   "Loose clips": "Lose Clips",
   "Saved by you": "Von dir gespeichert",
   "Honk": "Hupe",
+  "Emergency braking": "Notbremsung",
+  "Collision": "Kollision",
   "No events match this filter.": "Keine Ereignisse passen zu diesem Filter.",
   "Telemetry": "Telemetrie",
   "Telemetry available": "Telemetrie verfügbar",

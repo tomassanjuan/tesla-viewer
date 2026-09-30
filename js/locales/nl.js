@@ -79,6 +79,8 @@ export default {
   "Loose clips": "Losse clips",
   "Saved by you": "Door jou opgeslagen",
   "Honk": "Claxon",
+  "Emergency braking": "Noodremming",
+  "Collision": "Botsing",
   "No events match this filter.": "Geen gebeurtenissen voldoen aan dit filter.",
   "Telemetry": "Telemetrie",
   "Telemetry available": "Telemetrie beschikbaar",

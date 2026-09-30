@@ -79,6 +79,8 @@ export default {
   "Loose clips": "単独クリップ",
   "Saved by you": "手動で保存",
   "Honk": "クラクション",
+  "Emergency braking": "緊急ブレーキ",
+  "Collision": "衝突",
   "No events match this filter.": "このフィルターに一致するイベントはありません。",
   "Telemetry": "テレメトリ",
   "Telemetry available": "テレメトリあり",
