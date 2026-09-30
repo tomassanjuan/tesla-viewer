@@ -153,9 +153,11 @@ function showTelemetry(e, el) {
   el.querySelector('.ttl').append(s);
 }
 async function probeTelemetry(e, el) {
-  const f = e.segments[0].cams.front ?? Object.values(e.segments[0].cams)[0];
-  if (e.telemetry === undefined && f && !(encrypted.has(f) && !decrypted.has(f))) {
-    try { e.telemetry = await probeSei(resolve(f)); } catch { e.telemetry = null; }
+  if (e.telemetry === undefined) {
+    // any cam of the first segment may carry the SEI (openEvent parses cams in the same order)
+    const fs = CAMS.map((c) => e.segments[0].cams[c]).filter((f) => f && !(encrypted.has(f) && !decrypted.has(f)));
+    try { for (const f of fs) if ((e.telemetry = await probeSei(resolve(f))) === true) break; } catch { e.telemetry = null; }
+    if (!fs.length) e.telemetry = undefined;
   }
   showTelemetry(e, el);
 }
@@ -211,6 +213,7 @@ async function openEvent(e) {
   } finally { load.end(); }
   let pe = null;
   for (const s of segs) { s.gapBefore = pe == null ? 0 : Math.max(0, (s.wall - pe) / 1000); pe = s.wall + s.dur * 1000; if (s.gapBefore < GAP_MIN_S) s.gapBefore = 0; }
+  if (withTel) { e.telemetry = true; e._el && showTelemetry(e, e._el); }   // parsing is the truth, whatever the cheap probe said
   const diag = { withTelemetry: withTel, total: segs.length, codec, firstError: firstErr };
   const geo = samples.filter((m) => m.lat || m.lon);
   let maxKmh = 1; for (const m of samples) maxKmh = Math.max(maxKmh, m.speedMps * 3.6);
