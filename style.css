@@ -41,7 +41,8 @@ h1,h2{margin:0}
 :focus-visible{box-shadow:var(--ring);border-radius:var(--r-sm)}
 .ic{width:18px;height:18px;flex:none;vertical-align:-4px}
 #app{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);height:100vh;height:100dvh}
-.side-off #app{grid-template-columns:0 minmax(0,1fr)}
+/* #side is display:none when collapsed, so main auto-places into column 1: leave a single column */
+.side-off #app{grid-template-columns:minmax(0,1fr)}
 
 /* ---------- buttons & fields ---------- */
 .btn,.ibtn{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}

@@ -237,3 +237,27 @@ test('timeline ticks sit where the telemetry event happens (multi-clip trip)', a
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('sidebar toggle keeps the main area full width, with and without a resized sidebar', async ({ page }) => {
+  const main = () => page.locator('main').evaluate((el) => Math.round(el.getBoundingClientRect().width));
+  const toggle = page.locator('#sideToggle');
+  const vw = 1280;
+  for (const side of [300, 460]) {
+    await page.evaluate((w) => document.documentElement.style.setProperty('--side-w', w + 'px'), side);
+    expect(await main()).toBeGreaterThan(vw - side - 4);
+    await toggle.click();
+    await expect(page.locator('html')).toHaveClass(/side-off/);
+    expect(await main()).toBeGreaterThan(vw - 4);
+    await toggle.click();
+    await expect(page.locator('html')).not.toHaveClass(/side-off/);
+    expect(await main()).toBeGreaterThan(vw - side - 4);
+    expect(await main()).toBeLessThan(vw - side + 4);
+  }
+});
+
+test('collapsed sidebar persists across reload with a saved width', async ({ page }) => {
+  await page.evaluate(() => { localStorage.setItem('tv-side', '0'); localStorage.setItem('tv-side-w', '420'); });
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/side-off/);
+  expect(await page.locator('main').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(1270);
+});
