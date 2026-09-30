@@ -12,7 +12,7 @@ import { createGraph } from './graph.js';
 import { t } from './i18n.js';
 import { renderLegend, SIGNALS } from './legend.js';
 import { seg } from './seg.js';
-import { spatialLayout } from './layout.js';
+import { spatialLayout, fitStage, DEFAULT_AR } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
 import { mountBusy } from './progress.js';
@@ -371,6 +371,7 @@ function buildGrid() {
     d.onkeydown = (k) => { if (k.key === 'Enter') toggleFocus(c); };
     d.ondblclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else d.requestFullscreen?.().catch(() => {}); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
+    vids[c].addEventListener('loadedmetadata', fit);
   }
   applyLayout();
 }
@@ -388,23 +389,46 @@ function toggleFocus(c) {
 function applyLayout() {
   const g = $('grid'), focus = $('layout').value === 'focus';
   g.classList.toggle('focus', focus); $('app').classList.toggle('dash', dash());
-  if (focus) { g.style.gridTemplateColumns = '1fr'; g.style.gridTemplateRows = '1fr'; }
-  else buildGridTemplate();
-  for (const d of g.children) { const p = focus ? null : layout.place[d._cam]; d.style.gridColumn = p ? p.col : ''; d.style.gridRow = p ? p.row : ''; }
+  layout = spatialLayout(ev.cams);
   for (const d of g.children) d.classList.toggle('main', d._cam === focusCam);
+  fit();
 }
 let layout = { place: {} };
-function buildGridTemplate() {
-  layout = spatialLayout(ev.cams); const g = $('grid');
-  g.style.gridTemplateColumns = `repeat(${layout.cols},1fr)`;
-  g.style.gridTemplateRows = `repeat(${layout.rows},1fr)`;
+
+// Size every tile to its video's real aspect ratio so no black bars are left inside tiles (video is never cropped).
+const arOf = (v) => (v?.videoWidth > 0 && v.videoHeight > 0 ? v.videoWidth / v.videoHeight : DEFAULT_AR);
+function fit() {
+  const g = $('grid'), st = $('stage'); if (!ev || !g.children.length || dash()) return;
+  const focus = g.classList.contains('focus'), phone = PHONE?.matches, root = document.documentElement.style;
+  const tiles = [...g.children], vis = focus ? tiles.filter((d) => d.classList.contains('main')) : tiles;
+  for (const d of tiles) d.style.aspectRatio = arOf(vids[d._cam]);
+  const mainAr = arOf(vids[focusCam] ?? Object.values(vids)[0]);
+  const geo = (d, r) => { const s = d.style; s.position = r ? 'absolute' : ''; s.right = r ? 'auto' : ''; s.left = r ? `${r.x}px` : ''; s.top = r ? `${r.y}px` : ''; s.width = r ? `${r.w}px` : ''; s.height = r ? `${r.h}px` : ''; };
+  if (phone) {
+    // portrait: stage height follows the main video's aspect; strip thumbnails keep their own aspect (see style.css)
+    const strip = !focus && tiles.length > 1 ? 82 : 0; root.setProperty('--ar', mainAr); root.setProperty('--strip-h', `${strip}px`);
+    for (const d of tiles) geo(d, null);
+    const main = tiles.find((d) => d.classList.contains('main')) ?? tiles[0]; if (!main) return;
+    const W = st.clientWidth, H = st.clientHeight - (focus ? 0 : g.offsetHeight);
+    const b = fitStage({ W, H, cams: [{ id: main._cam, ar: mainAr }], pad: 0 }).rects[main._cam];
+    if (b) geo(main, b);
+    return;
+  }
+  root.removeProperty('--ar'); root.removeProperty('--strip-h');
+  const cams = vis.map((d) => ({ id: d._cam, ar: arOf(vids[d._cam]) }));
+  const r = fitStage({ W: st.clientWidth, H: st.clientHeight, cams, place: focus ? null : layout.place, hero: focusCam });
+  for (const d of tiles) geo(d, r.rects[d._cam]);
+  g.dataset.fit = r.mode;
 }
+new ResizeObserver(() => fit()).observe($('stage'));
+addEventListener('resize', () => fit());
 
 const dash = () => $('layout').value === 'dash'; // telemetry-only view: videos stay paused, a virtual clock drives the timeline
 let dashT = 0, dashLast = 0;
 const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
 const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
+const LOAD_MS = +new URLSearchParams(location.search).get('loadms') || 8000;   // per-cam load timeout; ?loadms= lets tests shorten it
 let loadCtl;   // aborts the previous loadSeg when a newer one starts (seek/scrub/auto-advance/new clip), so its busy task always ends
 async function loadSeg(i, at) {
   loadCtl?.abort(); const ctl = loadCtl = new AbortController();
@@ -417,7 +441,7 @@ async function loadSeg(i, at) {
       if (v.src) URL.revokeObjectURL(v.src);
       if (!f || (encrypted.has(f) && !decrypted.has(f))) { v.removeAttribute('src'); v.load(); return; }
       v.src = URL.createObjectURL(resolve(f));
-      const r = await waitLoaded(v, { signal: ctl.signal });
+      const r = await waitLoaded(v, { signal: ctl.signal, ms: LOAD_MS });
       if (r === 'ok') { v.currentTime = at; v.playbackRate = +$('speed').value; }
       else if (r !== 'aborted') failed.push(`${NAMES[c]} (${r})`);
     }));
