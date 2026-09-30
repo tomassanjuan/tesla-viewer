@@ -91,7 +91,7 @@ summary em{color:var(--warn);font-style:normal;font-size:11px}
 details label{font-size:12px;color:var(--mut);margin:var(--s3) 0 var(--s2)}
 details .btn{width:100%;justify-content:center}
 #extras-side{display:flex;flex-direction:column;gap:var(--s3);margin-top:var(--s2)}
-.ver{margin-top:auto;padding-top:var(--s3);color:var(--mut);font-size:12px;text-decoration:none}
+.ver{margin-left:auto;color:var(--mut);font-size:12px;text-decoration:none;white-space:nowrap}
 .ver:hover{color:var(--accent);text-decoration:underline}
 #extras-side:empty,#extras-dock:empty,#extras-panels:empty{display:none}
 
@@ -248,15 +248,21 @@ canvas{background:transparent}
    Shell layout: the page never scrolls. <main> is the scroll container; the video stage and the
    scrub/transport rows are sticky, so the video stays visible while controls, graph and map scroll
    beneath. The library becomes a slide-over drawer. Keep the query in sync with PHONE in js/app.js. */
-#mbar,#scrim{display:none}
+#scrim{display:none}
+/* top bar: always visible (desktop + phone) with build version and language chips */
+#mbar{display:flex;align-items:center;gap:var(--s3);flex:none;min-height:40px;padding:var(--s1) var(--s3);background:var(--surface);border-bottom:1px solid var(--border)}
+#mbar b,#menuBtn{display:none}
 @media (max-width:860px),(orientation:landscape) and (max-height:520px) and (max-width:1000px){
-  :root{--mbar:calc(48px + env(safe-area-inset-top));--stage-h:min(calc(100vw * .66 + 82px),46dvh);--strip:82px}
+  :root{--mbar:calc(84px + env(safe-area-inset-top));--stage-h:min(calc(100vw * .66 + 82px),46dvh);--strip:82px}
   button,label,.cam{-webkit-tap-highlight-color:transparent}
   #app{display:block;height:100dvh;overflow:hidden}
   main{height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 
-  #mbar{display:flex;align-items:center;gap:var(--s3);height:var(--mbar);padding:env(safe-area-inset-top) var(--s3) 0;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:8}
-  #mbar b{font-size:16px;letter-spacing:-.01em}
+  #mbar{flex-wrap:wrap;align-content:center;height:var(--mbar);padding:env(safe-area-inset-top) var(--s3) 0;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:8}
+  #mbar b,#menuBtn{display:inline-grid}
+  #mbar b{display:block;font-size:16px;letter-spacing:-.01em}
+  #mbar #lang{flex:1 0 100%;flex-wrap:nowrap}
+  #mbar #lang button{flex:1;min-width:0;padding:0 2px;min-height:26px;font-size:11px}
 
   /* drawer */
   #side{position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(88vw,340px);border:0;border-right:1px solid var(--border);box-shadow:var(--shadow-2);overflow:auto;overscroll-behavior:contain;padding:calc(var(--s4) + env(safe-area-inset-top)) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom)) calc(var(--s4) + env(safe-area-inset-left));transform:translateX(-105%);visibility:hidden;transition:transform .22s ease,visibility 0s .22s}
@@ -337,6 +343,9 @@ canvas{background:transparent}
 }
 @media (orientation:landscape) and (max-height:520px) and (max-width:1000px){
   :root{--mbar:calc(44px + env(safe-area-inset-top));--stage-h:0px}
+  #mbar{flex-wrap:nowrap}
+  #mbar #lang{flex:0 0 auto}
+  #mbar #lang button{flex:none;padding:0 var(--s2);min-width:30px}
   #app.dash{--stage-h:0px}
   .scrub{height:40px}
   .dock-row>.grp:first-child{top:calc(var(--mbar) + 40px);padding-bottom:var(--s1)}
