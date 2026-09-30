@@ -11,6 +11,7 @@ import { seg } from './seg.js';
 import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
+import { mountBusy } from './progress.js';
 import { due, pickDriftFix, shouldPlay, initPerf } from './perf.js';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -18,6 +19,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repeater: 'Right', left_pillar: 'L pillar', right_pillar: 'R pillar' };
 
+const busy = mountBusy();
 const map = createMap($('map'));
 const graph = createGraph($('graph'), { seek: (t) => ev && seekGlobal(t) });
 $('tiles').onchange = (e) => map.setTiles(e.target.checked);
@@ -29,13 +31,18 @@ const resolve = (f) => decrypted.get(f) ?? f;
 // ---------- loading ----------
 async function addFiles(list) {
   const items = [...list].map((f) => ({ path: f.webkitRelativePath || f.path || f.name, file: f }));
-  for (const { file } of items) {
+  const scan = busy.begin('Scanning files', items.length);
+  try {
+  for (const [i, { file }] of items.entries()) {
+    scan.set(i + 1);
     if (!/\.mp4$/i.test(file.name)) continue;
     const head = new Uint8Array(await file.slice(0, 0x2000).arrayBuffer());
     try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
-  for (const e of events) if (e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
+  scan.set(0, events.length, 'Reading events');
+  for (const [i, e] of events.entries()) if (scan.set(i + 1), e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
+  } finally { scan.end(); }
   filter.category = ''; filter.type = '';
   renderEvents();
   updateCryptUi();
@@ -158,7 +165,10 @@ async function openEvent(e) {
   const segs = e.segments.map((s) => ({ ...s, dur: 0, start: 0 }));
   const samples = [];
   let blocked = 0, t0 = 0, hevc = false, withTel = 0, codec = '', firstErr = '';
-  for (const s of segs) {
+  const load = busy.begin('Reading telemetry', segs.length);
+  try {
+  for (const [si, s] of segs.entries()) {
+    load.set(si + 1);
     s.start = t0; s.wall = tsToDate(s.ts).getTime();
     const order = [...CAMS.filter((c) => s.cams[c]), ...Object.keys(s.cams).filter((c) => !CAMS.includes(c))];
     if (order.every((c) => encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c]))) { blocked++; s.dur = 60; t0 += 60; continue; }
@@ -175,6 +185,7 @@ async function openEvent(e) {
     s.dur = dur ?? await probeDuration(resolve(s.cams[order.find((c) => !(encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c])))]));
     t0 += s.dur;
   }
+  } finally { load.end(); }
   let pe = null;
   for (const s of segs) { s.gapBefore = pe == null ? 0 : Math.max(0, (s.wall - pe) / 1000); pe = s.wall + s.dur * 1000; if (s.gapBefore < GAP_MIN_S) s.gapBefore = 0; }
   const diag = { withTelemetry: withTel, total: segs.length, codec, firstError: firstErr };
@@ -282,7 +293,8 @@ const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.c
 
 async function loadSeg(i, at) {
   segIdx = i;
-  const s = ev.segs[i];
+  const s = ev.segs[i], task = busy.begin('Loading video');
+  try {
   await Promise.all(ev.cams.map((c) => new Promise((res) => {
     const v = vids[c], f = s.cams[c];
     if (v.src) URL.revokeObjectURL(v.src);
@@ -291,6 +303,7 @@ async function loadSeg(i, at) {
     v.onerror = () => res();
     v.src = URL.createObjectURL(resolve(f));
   })));
+  } finally { task.end(); }
   if (wantPlay) playAll();
 }
 
@@ -457,6 +470,6 @@ document.addEventListener('keydown', (e) => {
 const insightsRefresh = [];
 initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (f) => insightsRefresh.push(f) });
 initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
-initExport({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
+initExport({ busy, get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });
 initPerf({ vids, codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) resync(); } });
