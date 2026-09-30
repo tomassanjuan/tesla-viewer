@@ -35,7 +35,7 @@ export async function decodeInfo(codec, width, height, fps = 36) {
   } catch { return null; }
 }
 
-/** Builds the readout + low-load toggle. api: { vids, getLowLoad, setLowLoad, codec } */
+/** Builds the readout + low-load toggle. api: { vids, state(cam), setLowLoad, codec } */
 export function initPerf(api) {
   const stage = document.getElementById('extras-stage') ?? document.body;
   document.head.append(Object.assign(document.createElement('style'), { textContent:
@@ -50,8 +50,8 @@ export function initPerf(api) {
     for (const [id, v] of Object.entries(api.vids)) {
       if (!v.src || !v.getVideoPlaybackQuality) continue;
       const q = v.getVideoPlaybackQuality(), p = prev[id] ?? { totalVideoFrames: 0, droppedVideoFrames: 0 };
-      const idle = v.paused || q.totalVideoFrames <= p.totalVideoFrames;
-      lines.push(`${id.padEnd(15)} ${idle ? 'paused' : `drop ${dropRate(p, q).toFixed(0).padStart(3)}%`}`);
+      const st = api.state?.(id) ?? (v.paused ? 'paused' : 'playing');   // playing | buffering | stalled | error | paused (on purpose) | ended
+      lines.push(`${id.padEnd(15)} ${st === 'playing' ? `drop ${dropRate(p, q).toFixed(0).padStart(3)}%` : st}`);
       prev[id] = { totalVideoFrames: q.totalVideoFrames, droppedVideoFrames: q.droppedVideoFrames };
     }
     out.textContent = `${hw}\n${lines.join('\n')}`;
