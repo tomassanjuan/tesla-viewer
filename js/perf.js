@@ -37,23 +37,21 @@ export async function decodeInfo(codec, width, height, fps = 36) {
 
 /** Builds the readout + low-load toggle. api: { vids, getLowLoad, setLowLoad, codec } */
 export function initPerf(api) {
-  const dock = document.getElementById('extras-dock') ?? document.body;
   const stage = document.getElementById('extras-stage') ?? document.body;
   document.head.append(Object.assign(document.createElement('style'), { textContent:
     '.perf-out{position:fixed;left:8px;bottom:8px;z-index:20;font:11px/1.4 ui-monospace,monospace;background:#000a;color:#fff;padding:4px 8px;border-radius:6px;pointer-events:none;white-space:pre}.perf-out[hidden]{display:none}' }));
-  const lite = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Low load', title: 'Play only the focused camera' });
-  lite.setAttribute('aria-pressed', 'false');
+  const lite = document.getElementById('lowLoad'), btn = document.getElementById('perfBtn');
   lite.onclick = () => { const on = lite.getAttribute('aria-pressed') !== 'true'; lite.setAttribute('aria-pressed', String(on)); api.setLowLoad(on); };
-  const btn = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Perf' });
   const out = Object.assign(document.createElement('div'), { className: 'perf-out', hidden: true });
-  dock.append(lite, btn); stage.append(out);
+  stage.append(out);
   let prev = {}, hw = '', timer = 0;
   const tick = async () => {
     const lines = [];
     for (const [id, v] of Object.entries(api.vids)) {
       if (!v.src || !v.getVideoPlaybackQuality) continue;
       const q = v.getVideoPlaybackQuality(), p = prev[id] ?? { totalVideoFrames: 0, droppedVideoFrames: 0 };
-      lines.push(`${id.padEnd(15)} drop ${dropRate(p, q).toFixed(0).padStart(3)}%  (${q.droppedVideoFrames}/${q.totalVideoFrames})`);
+      const idle = v.paused || q.totalVideoFrames <= p.totalVideoFrames;
+      lines.push(`${id.padEnd(15)} ${idle ? 'paused' : `drop ${dropRate(p, q).toFixed(0).padStart(3)}%`}`);
       prev[id] = { totalVideoFrames: q.totalVideoFrames, droppedVideoFrames: q.droppedVideoFrames };
     }
     out.textContent = `${hw}\n${lines.join('\n')}`;
