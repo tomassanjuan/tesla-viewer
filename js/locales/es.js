@@ -79,6 +79,8 @@ export default {
   "Loose clips": "Clips sueltos",
   "Saved by you": "Guardado por ti",
   "Honk": "Claxon",
+  "Emergency braking": "Frenada de emergencia",
+  "Collision": "Colisión",
   "No events match this filter.": "Ningún evento coincide con este filtro.",
   "Telemetry": "Telemetría",
   "Telemetry available": "Telemetría disponible",

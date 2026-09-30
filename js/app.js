@@ -1,4 +1,4 @@
-import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, eventType, countBy, filterEvents } from './library.js';
+import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
 import { parseClip, probeSei } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
@@ -48,7 +48,7 @@ const visibleEvents = () => filterEvents(events, filter);
 
 function renderFilters() {
   const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
-  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), saved: t('Saved by you') };
+  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), saved: t('Saved by you') };
   const box = $('cats'); box.innerHTML = '';
   const byCat = countBy(events, (e) => e.category);
   const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
@@ -61,9 +61,10 @@ function renderFilters() {
   const tbox = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
   tbox.innerHTML = '';
   if (!byType[filter.type]) filter.type = '';
-  for (const k of EVENT_TYPES) if (byType[k]) {
+  const keys = [...EVENT_TYPES, ...Object.keys(byType).filter((k) => k.startsWith(RAW_PREFIX)).sort()];
+  for (const k of keys) if (byType[k]) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
-    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${TYPE_LABEL[k]} ${byType[k]}`;
+    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${TYPE_LABEL[k] ?? k.slice(RAW_PREFIX.length)} ${byType[k]}`;
     b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
     tbox.append(b);
   }

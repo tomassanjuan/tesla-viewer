@@ -79,6 +79,8 @@ export default {
   "Loose clips": "零散片段",
   "Saved by you": "手动保存",
   "Honk": "鸣笛",
+  "Emergency braking": "紧急制动",
+  "Collision": "碰撞",
   "No events match this filter.": "没有符合此筛选条件的事件。",
   "Telemetry": "遥测",
   "Telemetry available": "有遥测数据",
