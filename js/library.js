@@ -37,15 +37,16 @@ export function categoryOf(path) {
   return m ? m[2].toLowerCase() : 'loose';
 }
 
-export const EVENT_TYPES = ['emergency_braking', 'collision', 'person', 'motion', 'honk', 'saved'];
+export const EVENT_TYPES = ['emergency_braking', 'collision', 'handle', 'person', 'motion', 'honk', 'saved'];
 export const RAW_PREFIX = 'raw:';
 /** Event type from event.json `reason`: a known type, `raw:<reason>` for any other reason (shown under its own text), or null without a reason. */
 export function eventType(e) {
   const r = String(e.reason ?? '');
   if (/emergency_brak/i.test(r)) return 'emergency_braking';
   if (/collision|crash|accident|airbag/i.test(r)) return 'collision';
+  if (/handle_pulled/i.test(r)) return 'handle';
   if (/^sentry.*(object|person)/i.test(r)) return 'person';
-  if (/^sentry.*(motion|accelerometer)/i.test(r)) return 'motion';
+  if (/^sentry.*(motion|accel)/i.test(r)) return 'motion';
   if (/honk/i.test(r)) return 'honk';
   if (/^user_interaction/i.test(r)) return 'saved';
   return r ? RAW_PREFIX + r : e.category === 'saved' ? 'saved' : null;
@@ -101,6 +102,10 @@ const REASONS = {
   user_interaction_dashcam_icon_tap: 'Saved: dashcam icon tap',
   user_interaction_dashcam_panel_save: 'Saved: dashcam panel',
   vehicle_auto_emergency_braking: 'Emergency braking',
+  sentry_locked_handle_pulled: 'Door handle pulled while locked',
+  sentry_accel: 'Sentry: motion detected',
+  user_interaction_honk: 'Honk',
+  user_interaction_dashcam_icon_tapped: 'Saved: dashcam icon tap',
 };
 
 /** Parsed Tesla event.json -> { reason, place } display strings ('' when unknown). */

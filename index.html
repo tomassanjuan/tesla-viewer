@@ -63,9 +63,11 @@
   </details>
   <div id="extras-side"></div>
 </aside>
+<div id="sideResize" role="separator" aria-orientation="vertical" aria-label="Resize library sidebar" aria-valuemin="220" aria-valuemax="560" tabindex="0" title="Drag to resize, double-click to reset"></div>
 
 <main>
   <div id="mbar"><button id="menuBtn" class="ibtn" type="button" aria-label="Open library" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-panel"/></svg></button><b>Tesla Viewer</b><a id="ver" class="ver" href="https://github.com/tomassanjuan/tesla-viewer" target="_blank" rel="noopener" title="View source on GitHub">dev</a></div>
+  <div id="topbar"></div>
   <div id="stage">
     <div id="grid"></div>
     <div id="empty">
@@ -110,6 +112,7 @@
         <button id="setOut" class="btn" type="button" title="Set trim end"><svg class="ic"><use href="#i-out"/></svg>Set end</button>
         <button id="export" class="btn primary" type="button"><svg class="ic"><use href="#i-export"/></svg>Export video</button>
         <label class="chip"><input type="checkbox" id="expHud" checked>Burn in HUD</label>
+        <label class="chip"><input type="checkbox" id="showHud" checked>Show HUD</label>
         <label class="chip" title="Exports only the camera you enlarged by clicking it"><input type="checkbox" id="expFocus">Export enlarged cam only</label>
         <small id="trimInfo" class="note"></small>
       </div>

@@ -83,6 +83,7 @@ export default {
   "Honk": "Hupe",
   "Emergency braking": "Notbremsung",
   "Collision": "Kollision",
+  "Door handle pulled while locked": "Türgriff bei Verriegelung gezogen",
   "No events match this filter.": "Keine Ereignisse passen zu diesem Filter.",
   "Telemetry": "Telemetrie",
   "Telemetry available": "Telemetrie verfügbar",
@@ -116,6 +117,7 @@ export default {
   "Export video": "Video exportieren",
   "Download CSV": "CSV herunterladen",
   "Burn in HUD": "HUD einbrennen",
+  "Show HUD": "HUD anzeigen",
   "Export enlarged cam only": "Nur vergrößerte Kamera exportieren",
   "Edit blur": "Unschärfe bearbeiten",
 };

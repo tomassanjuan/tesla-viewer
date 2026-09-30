@@ -83,6 +83,7 @@ export default {
   "Honk": "鸣笛",
   "Emergency braking": "紧急制动",
   "Collision": "碰撞",
+  "Door handle pulled while locked": "锁车时拉动车门把手",
   "No events match this filter.": "没有符合此筛选条件的事件。",
   "Telemetry": "遥测",
   "Telemetry available": "有遥测数据",
@@ -116,6 +117,7 @@ export default {
   "Export video": "导出视频",
   "Download CSV": "下载 CSV",
   "Burn in HUD": "嵌入 HUD",
+  "Show HUD": "显示 HUD",
   "Export enlarged cam only": "仅导出放大的摄像头",
   "Edit blur": "编辑模糊",
 };

@@ -83,6 +83,7 @@ export default {
   "Honk": "クラクション",
   "Emergency braking": "緊急ブレーキ",
   "Collision": "衝突",
+  "Door handle pulled while locked": "施錠中にドアハンドルを引かれた",
   "No events match this filter.": "このフィルターに一致するイベントはありません。",
   "Telemetry": "テレメトリ",
   "Telemetry available": "テレメトリあり",
@@ -116,6 +117,7 @@ export default {
   "Export video": "動画を書き出す",
   "Download CSV": "CSVをダウンロード",
   "Burn in HUD": "HUDを焼き込む",
+  "Show HUD": "HUDを表示",
   "Export enlarged cam only": "拡大したカメラのみ書き出す",
   "Edit blur": "ぼかしを編集",
 };

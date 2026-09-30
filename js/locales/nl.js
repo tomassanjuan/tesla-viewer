@@ -83,6 +83,7 @@ export default {
   "Honk": "Claxon",
   "Emergency braking": "Noodremming",
   "Collision": "Botsing",
+  "Door handle pulled while locked": "Deurgreep getrokken terwijl vergrendeld",
   "No events match this filter.": "Geen gebeurtenissen voldoen aan dit filter.",
   "Telemetry": "Telemetrie",
   "Telemetry available": "Telemetrie beschikbaar",
@@ -116,6 +117,7 @@ export default {
   "Export video": "Video exporteren",
   "Download CSV": "CSV downloaden",
   "Burn in HUD": "HUD inbranden",
+  "Show HUD": "HUD tonen",
   "Export enlarged cam only": "Alleen vergrote camera exporteren",
   "Edit blur": "Vervaging bewerken",
 };

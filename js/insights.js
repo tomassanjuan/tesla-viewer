@@ -1,4 +1,6 @@
 // Trip insights: pure analysis over telemetry samples + a small DOM hook (init).
+import { TICKS } from './legend.js';
+import { t } from './i18n.js';
 export const DEFAULTS = { brakeMps2: 3, accelMps2: 2.5, turnMps2: 3.5, minGapS: 3, jitterMps: 60 };
 const R = 6371000, rad = Math.PI / 180;
 
@@ -60,6 +62,12 @@ export function analyze(samples, opt = {}) {
   return res;
 }
 
+/** Tooltip text: "<category> · m:ss" plus the peak value where the marker has one. */
+export function tickText(m) {
+  const s = Math.max(0, Math.round(m.t));
+  return `${t(TICKS[m.kind]?.label ?? m.label)}${m.label.match(/ [\d.]+ m\/s²$/)?.[0] ?? ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 export function formatSummary(r, units = 'kmh') {
   const mph = units === 'mph';
   const dist = mph ? `${(r.distanceM / 1609.344).toFixed(2)} mi` : `${(r.distanceM / 1000).toFixed(2)} km`;
@@ -75,7 +83,8 @@ const CSS = `.ins-panel{font-size:12px;padding:8px;display:grid;grid-template-co
 .ins-panel div{display:flex;justify-content:space-between;gap:6px}.ins-panel .k{opacity:.65}
 .ins-ticks{position:absolute;left:0;right:0;top:0;height:100%;pointer-events:none}
 .ins-tick{position:absolute;top:0;width:6px;height:100%;margin-left:-3px;padding:0;border:0;border-radius:2px;cursor:pointer;pointer-events:auto;opacity:.85}
-.ins-tick.brake{background:#e31937}.ins-tick.accel{background:#f5a524}.ins-tick.turn{background:#a78bfa}.ins-tick.ap-on{background:#3ecf8e}.ins-tick.ap-off{background:#8b93a1}`;
+${Object.entries(TICKS).map(([k, v]) => `.ins-tick.${k}{background:${v.color}}`).join('')}
+.ins-tip{position:absolute;bottom:100%;transform:translateX(-50%);margin-bottom:4px;padding:2px 8px;border-radius:6px;background:#000c;color:#fff;font-size:12px;white-space:nowrap;pointer-events:none;z-index:5}`;
 
 /** ctx: { getEvent() -> {samples,total}|null, seek(t), onUpdate(fn) registers fn to run when a new event loads }. */
 export function init(ctx) {
@@ -86,9 +95,16 @@ export function init(ctx) {
   const par = seekEl.parentElement;
   if (getComputedStyle(par).position === 'static') par.style.position = 'relative';
   const ticks = Object.assign(document.createElement('div'), { className: 'ins-ticks' }); par.append(ticks);
+  // tap/click shows the tooltip too (no hover on phones); it fades after a moment
+  const tip = Object.assign(document.createElement('div'), { className: 'ins-tip', hidden: true }); par.append(tip);
+  let tipTimer;
+  function showTip(left, text) {
+    tip.textContent = text; tip.style.left = left; tip.hidden = false;
+    clearTimeout(tipTimer); tipTimer = setTimeout(() => { tip.hidden = true; }, 2500);
+  }
   function refresh() {
     const ev = ctx.getEvent?.();
-    panel.replaceChildren(); ticks.replaceChildren();
+    panel.replaceChildren(); ticks.replaceChildren(); tip.hidden = true;
     if (!ev?.samples?.length) { panel.hidden = true; return; }
     const r = analyze(ev.samples);
     panel.hidden = false;
@@ -97,10 +113,10 @@ export function init(ctx) {
       a.className = 'k'; a.textContent = k; b.textContent = v; d.append(a, b); panel.append(d);
     }
     for (const m of r.markers) {
-      const b = document.createElement('button');
-      b.className = `ins-tick ${m.kind}`; b.title = m.label; b.setAttribute('aria-label', m.label);
+      const b = document.createElement('button'), text = tickText(m);
+      b.className = `ins-tick ${m.kind}`; b.title = text; b.setAttribute('aria-label', text);
       b.style.left = `${(m.t / ev.total) * 100}%`;
-      b.onclick = () => ctx.seek(m.t);
+      b.onclick = () => { ctx.seek(m.t); showTip(b.style.left, text); };
       ticks.append(b);
     }
   }

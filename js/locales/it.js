@@ -83,6 +83,7 @@ export default {
   "Honk": "Clacson",
   "Emergency braking": "Frenata d'emergenza",
   "Collision": "Collisione",
+  "Door handle pulled while locked": "Maniglia tirata a veicolo bloccato",
   "No events match this filter.": "Nessun evento corrisponde a questo filtro.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria disponibile",
@@ -116,6 +117,7 @@ export default {
   "Export video": "Esporta video",
   "Download CSV": "Scarica CSV",
   "Burn in HUD": "Incorpora HUD",
+  "Show HUD": "Mostra HUD",
   "Export enlarged cam only": "Esporta solo la camera ingrandita",
   "Edit blur": "Modifica sfocatura",
 };

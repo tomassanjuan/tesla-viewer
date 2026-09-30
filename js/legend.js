@@ -7,6 +7,15 @@ export const COLOR = {
   played: '--accent', gap: '--warn', trim: '--warn', driven: '--route-driven', ahead: '--route-ahead', position: '--accent',
 };
 
+// Timeline ticks (telemetry insights, see insights.js): one definition for the seek-bar ticks, their tooltips and the legend.
+export const TICKS = {
+  brake: { color: '#e31937', label: 'Hard braking' },
+  accel: { color: '#f5a524', label: 'Hard acceleration' },
+  turn: { color: '#a78bfa', label: 'Sharp turn' },
+  'ap-on': { color: '#3ecf8e', label: 'Autopilot engaged' },
+  'ap-off': { color: '#8b93a1', label: 'Autopilot disengaged' },
+};
+
 // kind selects the swatch shape (see .lg-* in style.css); color is a CSS var name or literal color.
 export const LEGEND = [
   { id: 'graph', title: 'Graph', items: [
@@ -20,6 +29,7 @@ export const LEGEND = [
     { kind: 'line', color: COLOR.played, label: 'Played' },
     { kind: 'hatch', color: COLOR.gap, label: 'Clip gap' },
     { kind: 'bar', color: COLOR.trim, label: 'Trim start / end' },
+    ...Object.values(TICKS).map((k) => ({ kind: 'bar', color: k.color, label: k.label })),
   ] },
   { id: 'map', title: 'Map', items: [
     { kind: 'line', color: COLOR.driven, label: 'Driven' },

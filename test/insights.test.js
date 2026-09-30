@@ -69,3 +69,15 @@ test('formatEventInfo', () => {
   assert.equal(formatEventInfo({ reason: 'user_interaction_foo_bar', est_lat: '59.9', est_lon: '10.75' }).place, '59.9000, 10.7500');
   assert.deepEqual(formatEventInfo(null), { reason: '', place: '', city: '' });
 });
+
+test('tick tooltips and legend share one definition', async () => {
+  const { tickText } = await import('../js/insights.js');
+  const { TICKS, LEGEND } = await import('../js/legend.js');
+  const r = analyze(drive(61, (t) => ({ ax: t >= 20 && t <= 22 ? -6 : 0, ay: t === 10 ? 5 : 0, autopilot: t >= 30 ? 2 : 0 })));
+  assert.equal(new Set(r.markers.map((m) => m.kind)).size, 3);
+  for (const m of r.markers) assert.ok(TICKS[m.kind], m.kind);
+  assert.match(tickText(r.markers.find((m) => m.kind === 'brake')), /^Hard braking .* m\/s² · 0:2\d$/);
+  assert.equal(tickText(r.markers.find((m) => m.kind === 'ap-on')), 'Autopilot engaged · 0:30');
+  const legend = LEGEND.find((g) => g.id === 'timeline').items.map((i) => `${i.label}:${i.color}`);
+  for (const k of Object.values(TICKS)) assert.ok(legend.includes(`${k.label}:${k.color}`), k.label);
+});
