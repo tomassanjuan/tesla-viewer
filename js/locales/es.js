@@ -120,4 +120,5 @@ export default {
   "Show HUD": "Mostrar HUD",
   "Export enlarged cam only": "Exportar solo cámara ampliada",
   "Edit blur": "Editar difuminado",
+  "Search clips": "Buscar clips",
 };

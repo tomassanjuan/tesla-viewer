@@ -27,6 +27,7 @@ const evt = (page, text) => page.locator('#events .ev', { hasText: text });
 const chip = (page, sel, text) => page.locator(`${sel} button`, { hasText: text });
 // #layout/#units/#groupby are <select>s or button groups (js/seg.js); both expose .value, so drive them either way.
 const setOpt = async (page, id, v) => {
+  if (/groupby|sortby/.test(id)) await page.locator('#libopts').evaluate((d) => { d.open = true; });
   const b = page.locator(`${id} [data-v="${v}"]`);
   if (await b.count()) await b.click(); else await page.locator(id).selectOption(v);
 };

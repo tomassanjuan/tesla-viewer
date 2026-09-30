@@ -306,7 +306,9 @@ canvas{background:transparent}
   #scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s}
   .side-open #scrim{opacity:1;pointer-events:auto}
   #sideToggle,#sideResize{display:none}
-  .cat{min-height:36px}
+  .cat{min-height:34px}
+  .evgroup{top:calc(-1 * (var(--s4) + env(safe-area-inset-top)))}
+  .search,.libopts summary{min-height:44px}
 
   /* stage: one large camera + a swipeable strip of the others (tap a thumbnail to swap) */
   #stage{--strip:0px;position:sticky;top:var(--mbar);z-index:7;flex:none;height:var(--stage-h);display:flex;flex-direction:column;justify-content:flex-end}
@@ -423,19 +425,44 @@ canvas{background:transparent}
 @media (max-width:860px){#topbar{display:block;line-height:22px;height:max-content;align-self:start}#topbar>*{display:inline-block;margin-right:var(--s3);vertical-align:middle}.tb-diag{display:none}.apchip{display:inline-flex;margin-left:0}}
 
 /* ---------- UI polish: sidebar ---------- */
+#side{gap:var(--s2)}
+#status:empty{display:none}
 .eyebrow,.ctl-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
-.ctl-l{margin-top:var(--s2)}
-.cats{gap:6px;margin:var(--s1) 0 0}
-.cats+.cats{margin-top:var(--s2);padding-top:var(--s2);border-top:1px solid var(--border)}
-.cats:empty+.cats{margin-top:var(--s1);padding-top:0;border-top:0}
-.cat{min-height:30px;padding:0 10px}
+.eyebrow{margin:var(--s2) 0 0}
+.search{width:100%;min-height:36px;padding:0 var(--s3);font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)}
+.search::placeholder{color:var(--mut)}
+.search:focus-visible{box-shadow:var(--ring);border-color:transparent}
+.cats{gap:6px;margin:0}
+.cat{min-height:28px;padding:0 10px;font-size:12px}
 .cat .n{margin-left:4px;font-weight:600;opacity:.65}
 .cat.on{font-weight:600}
 .cat.on .n{opacity:.9}
-.ctl{margin:var(--s3) 0 var(--s2);gap:6px}
-.ev-thumb{display:block;grid-column:1/-1;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--r-sm);margin-bottom:var(--s1);background:var(--bg)}
-.ev small{color:var(--mut);font-size:12px;line-height:1.35}
-.evgroup{margin:var(--s4) 0 var(--s2);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+/* filter chips: primary category row, then compact type chips under it */
+#evtype:not(:empty){padding-top:var(--s2);border-top:1px solid var(--border)}
+/* group & sort live behind one summary row that shows what is active */
+.libopts{margin:var(--s1) 0 0;padding:0;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2)}
+.libopts summary{display:flex;align-items:center;gap:var(--s2);padding:0 var(--s3);min-height:36px;font-size:12px;color:var(--mut);list-style:none}
+.libopts summary::-webkit-details-marker{display:none}
+.libopts summary::before{content:"";width:6px;height:6px;flex:none;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.libopts[open] summary::before{transform:rotate(45deg)}
+.libopts summary:hover{color:var(--fg)}
+.libopts summary:focus-visible{border-radius:var(--r-sm)}
+.libopts .ctl{margin:0;padding:0 var(--s3) var(--s3)}
+.ctl{gap:6px}
+.ctl-l{margin-top:var(--s1)}
+/* clip cards: small thumbnail beside the title and meta */
+.ev{padding:var(--s2) var(--s3)}
+.ev-thumb{grid-column:1;grid-row:2/span 3;align-self:start;width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;margin:0;background:var(--bg)}
+.ev:has(.ev-thumb){grid-template-columns:88px minmax(0,1fr) auto}
+.ev:has(.ev-thumb) .ttl{grid-column:1/3;grid-row:1}
+.ev:has(.ev-thumb) small{grid-column:2/-1}
+.ev:has(.ev-thumb) .when{grid-column:2/-1}
+.ev:has(.ev-thumb) .badge{grid-column:3;grid-row:1}
+.ev small{color:var(--mut);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* sticky group headers */
+.evgroup{position:sticky;top:calc(-1 * var(--s4));z-index:2;background:var(--surface);margin:var(--s2) 0 0;padding:var(--s1) 0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;box-shadow:0 1px 0 var(--border)}
+#events{gap:0}
+.evgroup-list{padding:var(--s2) 0}
 
 /* ---------- UI polish: legend ---------- */
 .legend{font-size:12px;gap:var(--s2) var(--s5);padding:var(--s3) var(--s4) var(--s4);border-top:1px solid var(--border)}
@@ -472,3 +499,6 @@ canvas{background:transparent}
   .grp.end .ibtn,#extras-dock .blur-btn{width:36px;height:36px;border-radius:var(--r-sm)}
   #extras-dock .blur-btn{width:auto;padding:0 var(--s3)}
 }
+.ev b{font-size:13px}
+.ev .badge{padding:0 7px}
+.ev b{font-size:12.5px;letter-spacing:-.015em}.ev .ttl{gap:6px}
