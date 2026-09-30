@@ -16,6 +16,13 @@ export const TICKS = {
   'ap-off': { color: '#8b93a1', label: 'Autopilot disengaged' },
 };
 
+// Turn indicators: one definition (color, label, arrow path in a 24x24 box) for the HUD icons, timeline lane, tooltips and legend.
+export const SIGNAL_COLOR = '#f472b6';
+export const SIGNALS = {
+  left: { color: SIGNAL_COLOR, label: 'Left indicator', path: 'M10 4L2 12l8 8v-5h12V9H10z' },
+  right: { color: SIGNAL_COLOR, label: 'Right indicator', path: 'M14 4l8 8-8 8v-5H2V9h12z' },
+};
+
 // kind selects the swatch shape (see .lg-* in style.css); color is a CSS var name or literal color.
 export const LEGEND = [
   { id: 'graph', title: 'Graph', items: [
@@ -30,6 +37,7 @@ export const LEGEND = [
     { kind: 'hatch', color: COLOR.gap, label: 'Clip gap' },
     { kind: 'bar', color: COLOR.trim, label: 'Trim start / end' },
     ...Object.values(TICKS).map((k) => ({ kind: 'bar', color: k.color, label: k.label })),
+    ...Object.entries(SIGNALS).map(([side, k]) => ({ kind: `sig-${side}`, color: k.color, label: k.label })),
   ] },
   { id: 'map', title: 'Map', items: [
     { kind: 'line', color: COLOR.driven, label: 'Driven' },
