@@ -291,3 +291,17 @@ test('collapsed sidebar persists across reload with a saved width', async ({ pag
   await expect(page.locator('html')).toHaveClass(/side-off/);
   expect(await page.locator('main').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(1270);
 });
+
+test('loading overlay never sticks: overlapping segment loads and a failing cam all end the task', async ({ page }) => {
+  await load(page);
+  await open(page, 'Trip');
+  // two segment loads back to back: the first is superseded before its metadata/error event fires
+  await page.evaluate(() => {
+    const seek = document.getElementById('seek');
+    for (const v of [800, 100, 800, 100]) { seek.value = v; seek.dispatchEvent(new Event('input', { bubbles: true })); }
+  });
+  await expect(page.locator('#busy')).toBeHidden({ timeout: 12000 });
+  // fixtures are not decodable, so every cam errors: the failure is named, non-blocking, and the app stays usable
+  await expect(page.locator('#vidwarn')).toContainText(/Could not load: .*Front/);
+  await expect(page.locator('#play')).toBeEnabled();
+});
