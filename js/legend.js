@@ -3,7 +3,7 @@
 import { t } from './i18n.js';
 
 export const COLOR = {
-  speed: '--fg', ap: '--info', throttle: '--info', brake: '--accent', playhead: '--accent',
+  speed: '--fg', ap: '--info', throttle: '--throttle', brake: '--accent', playhead: '--accent',
   played: '--accent', gap: '--warn', trim: '--warn', driven: '--route-driven', ahead: '--route-ahead', position: '--accent',
 };
 
