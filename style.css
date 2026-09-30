@@ -415,3 +415,54 @@ canvas{background:transparent}
 #mbar+#topbar{border-top:0;padding-top:0}
 @media (min-width:861px) and (not (orientation:landscape) and (max-height:520px)){#mbar:has(+#topbar:not(:empty)){border-bottom:0}}
 @media (max-width:860px){#topbar{display:block;line-height:22px;height:max-content;align-self:start}#topbar>*{display:inline-block;margin-right:var(--s3);vertical-align:middle}.tb-diag{display:none}.apchip{display:inline-flex;margin-left:0}}
+
+/* ---------- UI polish: sidebar ---------- */
+.eyebrow,.ctl-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.ctl-l{margin-top:var(--s2)}
+.cats{gap:6px;margin:var(--s1) 0 0}
+.cats+.cats{margin-top:var(--s2);padding-top:var(--s2);border-top:1px solid var(--border)}
+.cats:empty+.cats{margin-top:var(--s1);padding-top:0;border-top:0}
+.cat{min-height:30px;padding:0 10px}
+.cat .n{margin-left:4px;font-weight:600;opacity:.65}
+.cat.on{font-weight:600}
+.cat.on .n{opacity:.9}
+.ctl{margin:var(--s3) 0 var(--s2);gap:6px}
+.ev-thumb{display:block;grid-column:1/-1;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--r-sm);margin-bottom:var(--s1);background:var(--bg)}
+.ev small{color:var(--mut);font-size:12px;line-height:1.35}
+.evgroup{margin:var(--s4) 0 var(--s2);text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+
+/* ---------- UI polish: legend ---------- */
+.legend{font-size:12px;gap:var(--s2) var(--s5);padding:var(--s3) var(--s4) var(--s4);border-top:1px solid var(--border)}
+.lg-group{gap:var(--s1) var(--s4)}
+.lg-group>b{padding:2px 8px;border-radius:var(--r-pill);background:var(--surface-2);letter-spacing:.08em}
+.lg-sw{width:18px}
+
+/* ---------- UI polish: desktop header + control dock (phone layout untouched) ---------- */
+@media (min-width:861px) and (not ((orientation:landscape) and (max-height:520px) and (max-width:1000px))){
+  /* one header row: clip info on the left, version + language on the right */
+  main{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr) auto auto auto;background:var(--surface)}
+  #app.dash main{grid-template-rows:auto minmax(0,1.1fr) auto minmax(0,1fr) auto}
+  #mbar{grid-area:1/2;border-bottom:0;min-height:48px;padding:var(--s1) var(--s4) var(--s1) var(--s2)}
+  #topbar{grid-area:1/1;border-bottom:0;background:none;min-height:48px;padding:var(--s1) var(--s4);gap:var(--s1) var(--s3);color:var(--mut)}
+  #topbar .tb-name{font-size:15px;color:var(--fg)}
+  #topbar .apchip{margin-left:0}
+  #topbar .tb-diag{margin-left:auto}
+  #stage{grid-area:2/1/3/-1;border-top:1px solid var(--border)}
+  #bar{grid-area:3/1/4/-1;padding:var(--s3) var(--s4) var(--s4);gap:var(--s1)}
+  #panels{grid-area:4/1/5/-1}
+  #legend{grid-area:5/1/6/-1}
+  /* dock: row 1 = playback (transport, speed/view/units/load, tools); row 2 = clip actions (trim, export, options) */
+  .dock-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 var(--s5)}
+  .dock-row>.grp:first-child{grid-area:1/1}
+  .dock-row>.grp:nth-child(2){grid-area:1/2/2/-1;gap:var(--s2) var(--s3)}
+  #gapgrp{grid-area:2/1/3/-1;margin-top:var(--s3)}
+  .trimgrp,.dock-row>.grp.end{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--border);align-self:start}
+  .trimgrp{grid-area:3/1/4/3}
+  .dock-row>.grp.end{grid-area:3/3;margin-left:0}
+  .trimgrp .btn.primary+.chip{margin-left:auto}
+  .trimgrp #trimInfo{align-self:center}
+  .chip{min-height:36px;padding:0 var(--s3);font-size:13px}
+  .chip:has(input:checked){background:var(--surface-2)}
+  .grp.end .ibtn,#extras-dock .blur-btn{width:36px;height:36px;border-radius:var(--r-sm)}
+  #extras-dock .blur-btn{width:auto;padding:0 var(--s3)}
+}
