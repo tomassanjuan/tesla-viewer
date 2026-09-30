@@ -337,17 +337,30 @@ test('collapsed sidebar persists across reload with a saved width', async ({ pag
   expect(await page.locator('main').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(1270);
 });
 
-test('loading overlay never sticks: overlapping segment loads and a failing cam all end the task', async ({ page }) => {
+test('loading overlay never sticks: overlapping segment loads all end the task', async ({ page }) => {
   await load(page);
   await open(page, 'Trip');
-  // two segment loads back to back: the first is superseded before its metadata/error event fires
+  // segment loads back to back: each is superseded before its metadata/error event fires
   await page.evaluate(() => {
     const seek = document.getElementById('seek');
     for (const v of [800, 100, 800, 100]) { seek.value = v; seek.dispatchEvent(new Event('input', { bubbles: true })); }
   });
   await expect(page.locator('#busy')).toBeHidden({ timeout: 12000 });
-  // fixtures are not decodable, so every cam errors: the failure is named, non-blocking, and the app stays usable
-  await expect(page.locator('#vidwarn')).toContainText(/Could not load: .*Front/);
+  await expect(page.locator('#play')).toBeEnabled();
+});
+
+test('a cam that never loads times out, is named, and the overlay still ends', async ({ page }) => {
+  // Whether the fixtures' fake H.264 loads or errors depends on the browser build, so force the failure instead of
+  // relying on it: the Back tile's src is ignored (metadata never arrives) and the per-cam timeout is shortened.
+  await page.addInitScript(() => {
+    const d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+    Object.defineProperty(HTMLMediaElement.prototype, 'src', { ...d, set(v) { if (this.parentElement?.textContent.trim() === 'Back') return; d.set.call(this, v); } });
+  });
+  await page.goto('/index.html?loadms=600');
+  await load(page);
+  await open(page, 'Trip');
+  await expect(page.locator('#vidwarn')).toContainText('Back (timeout)');
+  await expect(page.locator('#busy')).toBeHidden();
   await expect(page.locator('#play')).toBeEnabled();
 });
 
