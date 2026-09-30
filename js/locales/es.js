@@ -87,6 +87,8 @@ export default {
   "No events match this filter.": "Ningún evento coincide con este filtro.",
   "Telemetry": "Telemetría",
   "Telemetry available": "Telemetría disponible",
+  "Checking telemetry… {n} left": "Comprobando telemetría… faltan {n}",
+  "Only clips with telemetry": "Solo clips con telemetría",
   "Group by": "Agrupar por",
   "No grouping": "Sin agrupar",
   "Day": "Día",

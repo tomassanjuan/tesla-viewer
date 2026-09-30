@@ -1,6 +1,7 @@
 import { groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
 import { parseClipBlob, probeSei } from './mp4.js';
+import { typeIcon } from './icons.js';
 import { clipKey, getClip, setClip, getProbe, setProbe } from './telecache.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { updateTopbar } from './topbar.js';
@@ -48,18 +49,24 @@ async function addFiles(list) {
   scan.set(0, events.length, 'Reading events');
   for (const [i, e] of events.entries()) if (scan.set(i + 1), e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
   } finally { scan.end(); }
-  filter.category = ''; filter.type = ''; filter.q = ''; $('q').value = '';
+  filter.category = ''; filter.type = ''; filter.q = ''; filter.tele = false; $('q').value = '';
   renderEvents();
+  idle(scanTelemetry);
   updateCryptUi();
   if (events.length) openEvent(visibleEvents()[0] ?? events[0]);
 }
 
-const filter = { category: '', type: '', q: '' };
+const filter = { category: '', type: '', q: '', tele: false };
 const pref = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch { return d; } };
 const savePref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode: not persisted */ } };
 let groupBy = pref('groupBy', GROUPS, 'day'), sortBy = pref('sortBy', SORTS, 'newest');
 const collapsed = new Set();   // `${groupBy}:${key}` of collapsed group headers (session only)
 const visibleEvents = () => sortEvents(filterEvents(events, filter), sortBy);
+
+const setTypeHint = (txt) => { const h = $('evhint'); h.textContent = txt; h.hidden = !txt; };
+// Events whose telemetry probe is still to come (encrypted-and-locked ones can't be probed until decrypted).
+const probeable = (e) => e.telemetry === undefined && e.segments[0] && CAMS.some((c) => { const f = e.segments[0].cams[c]; return f && !(encrypted.has(f) && !decrypted.has(f)); });
+const pendingProbes = (list) => list.filter(probeable).length;
 
 // Shared event-type labels (filter chips and Type groups); unknown reasons show their own text.
 const typeLabel = (k) => ({ person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), handle: t('Door handle pulled while locked'), saved: t('Saved by you') })[k] ?? (k ? k.slice(RAW_PREFIX.length) : t('No type'));
@@ -74,16 +81,31 @@ function renderFilters() {
     b.onclick = () => { filter.category = k; renderEvents(); };
     box.append(b);
   }
-  const tbox = $('evtype'), byType = countBy(filterEvents(events, { category: filter.category }), eventType);
+  const inCat = filterEvents(events, { category: filter.category });
+  const known = inCat.filter((e) => e.telemetry === true).length, left = pendingProbes(inCat);
+  const tb = document.createElement('button'); tb.type = 'button'; tb.className = 'cat cat-tele' + (filter.tele ? ' on' : '');
+  tb.setAttribute('aria-pressed', filter.tele); tb.setAttribute('aria-busy', left > 0);
+  tb.title = left ? t('Checking telemetry… {n} left', { n: left }) : t('Only clips with telemetry');
+  tb.append(`${t('Telemetry')} `, Object.assign(document.createElement('span'), { className: 'n', textContent: left ? `${known}…` : known }));
+  tb.onclick = () => { filter.tele = !filter.tele; renderEvents(); };
+  if (events.length) box.append(tb);
+  const tbox = $('evtype'), byType = countBy(inCat, eventType);
   tbox.innerHTML = '';
   if (!byType[filter.type]) filter.type = '';
   const keys = [...EVENT_TYPES, ...Object.keys(byType).filter((k) => k.startsWith(RAW_PREFIX)).sort()];
   for (const k of keys) if (byType[k]) {
-    const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
-    b.setAttribute('aria-pressed', filter.type === k); b.append(`${typeLabel(k)} `, Object.assign(document.createElement('span'), { className: 'n', textContent: byType[k] }));
-    b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cat cat-ic' + (filter.type === k ? ' on' : '');
+    b.setAttribute('aria-pressed', filter.type === k); b.title = b.ariaLabel = typeLabel(k);
+    b.innerHTML = typeIcon(k); b.append(Object.assign(document.createElement('span'), { className: 'n', textContent: byType[k] }));
+    b.onclick = () => { if (b._held) { b._held = false; return; } filter.type = filter.type === k ? '' : k; renderEvents(); };
+    // touch has no hover tooltip: a long press names the chip in the hint line instead of toggling it
+    let timer; const stop = () => clearTimeout(timer);
+    b.onpointerdown = (ev) => { if (ev.pointerType === 'touch') timer = setTimeout(() => { b._held = true; setTypeHint(typeLabel(k)); }, 450); };
+    b.onpointerup = b.onpointercancel = b.onpointerleave = stop;
+    b.oncontextmenu = (ev) => ev.pointerType === 'touch' || b._held ? ev.preventDefault() : 0;
     tbox.append(b);
   }
+  setTypeHint(filter.type ? typeLabel(filter.type) : '');
   $('libopts').hidden = $('q').hidden = !events.length;
   const on = (id) => $(id).querySelector('.on')?.textContent ?? '';
   $('libsum').textContent = [groupBy === 'none' ? t('No grouping') : on('groupby'), on('sortby')].join(' · ');
@@ -106,8 +128,13 @@ function renderEvents() {
     const nc = new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
     d.innerHTML = `<div class="ttl"><b></b></div><span class="when">${e.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · ${e.segments.length} min</span><span class="badge">${nc} cam${nc === 1 ? '' : 's'}</span>`;
     d.querySelector('b').textContent = e.name;
-    const info = [e.info?.reason, e.info?.place].filter(Boolean).join(' · ');
-    if (info) { const s = document.createElement('small'); s.textContent = info; d.append(s); }
+    const ty = eventType(e), place = e.info?.place;
+    if (ty || place) {
+      const s = document.createElement('small');
+      if (ty) { const i = document.createElement('span'); i.className = 'ic-ty'; i.title = i.ariaLabel = typeLabel(ty); i.setAttribute('role', 'img'); i.innerHTML = typeIcon(ty); s.append(i); }
+      if (place) s.append(document.createTextNode(place));
+      d.append(s);
+    }
     if (e.thumb) {
       const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
       const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
@@ -133,6 +160,7 @@ function renderEvents() {
       const h = document.createElement('h3'); h.className = 'evgroup';
       const hb = document.createElement('button'); hb.type = 'button'; hb.setAttribute('aria-expanded', !closed);
       const lb = Object.assign(document.createElement('span'), { className: 'lbl', textContent: label });
+      if (groupBy === 'type') lb.insertAdjacentHTML('afterbegin', typeIcon(g.key));
       hb.append(Object.assign(document.createElement('span'), { className: 'chev', ariaHidden: 'true' }), lb, Object.assign(document.createElement('span'), { className: 'n', textContent: g.events.length }));
       h.append(hb);
       const w = document.createElement('div'); w.className = 'evgroup-list'; w.setAttribute('role', 'group'); w.setAttribute('aria-label', label); w.hidden = closed;
@@ -157,7 +185,7 @@ function showTelemetry(e, el) {
   s.setAttribute('role', 'img'); s.setAttribute('aria-label', t('Telemetry available'));
   el.querySelector('.ttl').append(s);
 }
-async function probeTelemetry(e, el) {
+async function probeTelemetry(e, el = e._el) {
   if (e.telemetry === undefined) {
     // any cam of the first segment may carry the SEI (openEvent parses cams in the same order)
     const fs = CAMS.map((c) => e.segments[0].cams[c]).filter((f) => f && !(encrypted.has(f) && !decrypted.has(f)));
@@ -170,8 +198,24 @@ async function probeTelemetry(e, el) {
     try { for (const f of fs) if ((e.telemetry = await probe(f)) === true) break; } catch { e.telemetry = null; }
     if (!fs.length) e.telemetry = undefined;
   }
-  showTelemetry(e, el);
+  if (el) showTelemetry(e, el);
 }
+
+// Background probe of every clip so the Telemetry chip's count is complete: head reads only, 2 at a time, cache first.
+let scanId = 0, refreshT;
+function scheduleRefresh() {
+  clearTimeout(refreshT);
+  refreshT = setTimeout(() => (filter.tele ? renderEvents() : renderFilters()), 250);
+}
+async function scanTelemetry() {
+  const id = ++scanId, queue = events.filter(probeable);
+  const run = async () => {
+    for (let e; id === scanId && (e = queue.shift());) { await probeTelemetry(e); scheduleRefresh(); }
+  };
+  await Promise.all([run(), run()]);
+  if (id === scanId) scheduleRefresh();
+}
+const idle = (fn) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 200));
 
 // ---------- clip parsing (worker pool, main-thread fallback) ----------
 const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 1));
@@ -502,7 +546,7 @@ function drawMap(t) {
 }
 
 // ---------- encryption ----------
-const cryptUi = initDecryptUi({ encrypted, decrypted, onUnlocked: () => ev && openEvent(ev.e) });
+const cryptUi = initDecryptUi({ encrypted, decrypted, onUnlocked: () => { scanTelemetry(); ev && openEvent(ev.e); } });
 const updateCryptUi = () => cryptUi.update();
 
 // ---------- wiring ----------

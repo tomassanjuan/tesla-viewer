@@ -24,7 +24,7 @@ const load = async (page) => {
   await expect(page.locator('#events .ev').first()).toBeVisible();
 };
 const evt = (page, text) => page.locator('#events .ev', { hasText: text });
-const chip = (page, sel, text) => page.locator(`${sel} button`, { hasText: text });
+const chip = (page, sel, text) => (sel === '#evtype' ? page.locator(`${sel} button`).and(page.getByLabel(text)) : page.locator(`${sel} button`, { hasText: text }));
 // #layout/#units/#groupby are <select>s or button groups (js/seg.js); both expose .value, so drive them either way.
 const setOpt = async (page, id, v) => {
   if (/groupby|sortby/.test(id)) await page.locator('#libopts').evaluate((d) => { d.open = true; });
@@ -80,7 +80,7 @@ test('click a camera to enlarge it and click again to restore the grid', async (
 test('event-type chips filter the library', async ({ page }) => {
   await load(page);
   await expect(chip(page, '#evtype', 'Saved by you')).toBeVisible();
-  await chip(page, '#evtype', /Person|Sentry/).click();
+  await chip(page, '#evtype', /Person or object/).click();
   await expect(page.locator('#events .ev')).toHaveCount(1);
   await expect(evt(page, '2026-03-03_22-00-00')).toBeVisible();
   await chip(page, '#evtype', 'Honk').click();
@@ -88,6 +88,42 @@ test('event-type chips filter the library', async ({ page }) => {
   await expect(evt(page, '2026-03-04_09-00-00')).toBeVisible();
   await chip(page, '#evtype', 'Honk').click();   // toggle off
   await expect(page.locator('#events .ev')).toHaveCount(4);
+});
+
+test('type chips are icons only: no visible text, name in title and aria-label', async ({ page }) => {
+  await load(page);
+  const honk = chip(page, '#evtype', 'Honk');
+  await expect(honk.locator('svg.tic')).toBeVisible();
+  await expect(honk).toHaveAttribute('title', 'Honk');
+  await expect(honk).toHaveText(/^\s*1\s*$/);   // the count only
+  await honk.click();
+  await expect(page.locator('#evhint')).toHaveText('Honk');
+  await expect(page.locator('#events .ev small .ic-ty').first()).toHaveAttribute('aria-label', 'Honk');
+});
+
+test('telemetry chip filters to clips with telemetry and combines with the other filters', async ({ page }) => {
+  await load(page);
+  const tele = page.locator('#cats .cat-tele');
+  await expect(tele.locator('.n')).toHaveText('3');   // fills in once the background probe is done (no "…")
+  await tele.click();
+  await expect(page.locator('#events .ev')).toHaveCount(3);
+  await expect(evt(page, '2026-03-03_22-00-00')).toHaveCount(0);   // sentry clip without SEI
+  await chip(page, '#cats', 'Saved').click();
+  await expect(page.locator('#events .ev')).toHaveCount(2);
+  await chip(page, '#evtype', 'Honk').click();
+  await expect(page.locator('#events .ev')).toHaveCount(1);
+  await tele.click();
+  await expect(page.locator('#events .ev')).toHaveCount(1);
+});
+
+test('phone drawer: telemetry chip and icon chips fit at 390px', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#pickDir').setInputFiles(folder);
+  await page.locator('#menuBtn').click();
+  await expect(page.locator('#events .ev').first()).toBeVisible();
+  const fits = async (sel) => { for (const b of await page.locator(sel).all()) { const r = await b.boundingBox(); if (r) { expect(r.x + r.width).toBeLessThanOrEqual(340); expect(r.height).toBeGreaterThanOrEqual(34); } } };
+  await expect(page.locator('#cats .cat-tele')).toBeVisible();
+  await fits('#cats button'); await fits('#evtype button');
 });
 
 test('category tabs filter the library', async ({ page }) => {

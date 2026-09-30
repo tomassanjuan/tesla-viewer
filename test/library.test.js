@@ -54,3 +54,18 @@ test('filterEvents free-text search: every word must match name, reason, place o
   assert.equal(filterEvents(evs, { q: 'honk paris' }).length, 0);
   assert.equal(filterEvents(evs, { q: '2026-03-02' })[0].name, '2026-03-02_10-00-00');
 });
+
+test('filterEvents tele: only clips whose probe found telemetry; combines with category and search', async () => {
+  const { filterEvents } = await import('../js/library.js');
+  const evs = [
+    { name: 'a', category: 'saved', telemetry: true },
+    { name: 'b', category: 'saved', telemetry: false },
+    { name: 'c', category: 'sentry', telemetry: null },
+    { name: 'd', category: 'sentry' },
+    { name: 'e', category: 'sentry', telemetry: true },
+  ];
+  assert.equal(filterEvents(evs, { tele: true }).length, 2);
+  assert.equal(filterEvents(evs, { tele: false }).length, 5);
+  assert.deepEqual(filterEvents(evs, { tele: true, category: 'sentry' }).map((e) => e.name), ['e']);
+  assert.deepEqual(filterEvents(evs, { tele: true, q: 'a' }).map((e) => e.name), ['a']);
+});

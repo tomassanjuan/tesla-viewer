@@ -506,3 +506,13 @@ canvas{background:transparent}
 .ev b{font-size:13px}
 .ev .badge{padding:0 7px}
 .ev b{font-size:12.5px;letter-spacing:-.015em}.ev .ttl{gap:6px}
+
+/* event-type icon chips (name lives in title/aria-label; long press shows it in #evhint on touch) */
+.cat-ic{display:inline-flex;align-items:center;gap:2px;min-width:44px;justify-content:center;padding:0 8px;-webkit-touch-callout:none;user-select:none}
+.tic{flex:none;display:block}
+.cat-ic .n{margin-left:2px}
+.cat-tele[aria-busy="true"] .n{opacity:.5}
+.evhint{margin:0;font-size:12px;color:var(--mut)}
+.ev small .ic-ty{display:inline-flex;vertical-align:middle;margin-right:var(--s2);color:var(--fg)}
+.evgroup .lbl .tic{vertical-align:-3px;margin-right:6px}
+@media (max-width:860px){#cats .cat,#evtype .cat{min-height:34px}.cat-ic{min-width:48px}}
