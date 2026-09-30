@@ -17,3 +17,13 @@ test('phone layout: markup hooks exist and the JS/CSS phone media queries match'
   assert.ok(q, 'PHONE media query not found in app.js');
   assert.ok(css.includes(`@media ${q}{`), 'style.css phone media query out of sync with app.js PHONE');
 });
+
+test('version badge and language chips live in the always-visible top bar, not the sidebar', () => {
+  const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const html = read('index.html');
+  const bar = html.match(/<div id="mbar">.*?<\/div>/s)?.[0] ?? '';
+  const side = html.match(/<aside id="side".*?<\/aside>/s)?.[0] ?? '';
+  assert.ok(bar.includes('id="ver"') && !side.includes('id="ver"'), '#ver must be in #mbar only');
+  assert.ok(read('js/i18n.js').includes("getElementById('mbar')") && !read('js/i18n.js').includes('extras-side'), 'language chips mount into #mbar');
+  assert.ok(!/#mbar\{display:none/.test(read('style.css').replace(/\s/g, '')), '#mbar must not be hidden on desktop');
+});

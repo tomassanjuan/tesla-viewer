@@ -57,7 +57,7 @@ if (typeof document !== 'undefined') {
   for (const [k, v] of Object.entries(LANGS)) { const b = Object.assign(document.createElement('button'), { type: 'button', textContent: k.toUpperCase(), title: v }); b.dataset.v = k; sel.append(b); }
   seg(sel);
   sel.onchange = () => setLang(sel.value);
-  (document.getElementById('extras-side') ?? document.body).append(sel);
+  (document.getElementById('mbar') ?? document.body).append(sel);
   new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) apply(n); })
     .observe(document.documentElement, { childList: true, subtree: true });
   const l = detect();
