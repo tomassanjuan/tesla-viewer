@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { LEGEND, COLOR } from '../js/legend.js';
+import { LEGEND, COLOR, TICKS } from '../js/legend.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
@@ -14,7 +14,7 @@ test('legend covers graph, timeline and map with unique labels per group', () =>
 });
 
 test('every legend color is a COLOR token that the drawing code reads', () => {
-  const tokens = new Set(Object.values(COLOR));
+  const tokens = new Set([...Object.values(COLOR), ...Object.values(TICKS).map((k) => k.color)]);
   for (const { items } of LEGEND) for (const i of items) assert.ok(tokens.has(i.color), i.label);
   const graph = read('js/graph.js'), map = read('js/map.js');
   for (const k of ['speed', 'ap', 'throttle', 'brake', 'playhead']) assert.ok(graph.includes(`COLOR.${k}`), `graph.js ignores COLOR.${k}`);
