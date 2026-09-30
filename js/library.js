@@ -1,6 +1,14 @@
 // Group dropped files into events: { name, segments:[{ts, cams:{front:File,...}}] }
 export const CAMS = ['front', 'back', 'left_repeater', 'right_repeater', 'left_pillar', 'right_pillar'];
-const RE = /(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})-(front|back|left_repeater|right_repeater|left_pillar|right_pillar)\.mp4$/i;
+const RE = /(?:^|\/)(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})-(front|back|left_repeater|right_repeater|left_pillar|right_pillar)\.mp4$/i;
+
+/** OS metadata that rides along in dropped folders: macOS AppleDouble sidecars (`._x`), .DS_Store, Thumbs.db. Never clips. */
+export const isJunkName = (path) => /^(\._.*|\.DS_Store|Thumbs\.db)$/i.test(String(path).split('/').pop());
+/** Head-bytes gate for an .mp4: a real `ftyp` box, or a file big enough to be a Tesla encrypted container (8 KiB header). Empty / tiny non-mp4 files fail. */
+export function looksLikeMp4OrTesla(head, size) {
+  if (head.length >= 8 && String.fromCharCode(head[4], head[5], head[6], head[7]) === 'ftyp') return true;
+  return size >= 0x2000;
+}
 
 export function parseName(path) {
   const m = RE.exec(path);
@@ -69,6 +77,7 @@ export function filterEvents(events, { category = '', type = '', q = '', tele = 
 export function groupFiles(files) {
   const dirs = new Map(), dirCat = new Map(), recent = new Map(), loose = new Map(), extras = [];
   for (const { path, file } of files) {
+    if (isJunkName(path)) continue;
     const p = parseName(path);
     const parts = path.split('/');
     const dir = parts.length > 1 ? parts.slice(-2, -1)[0] : '';

@@ -18,7 +18,7 @@ test.beforeAll(async ({ browser }) => {
   writeFileSync(join(d, 'event.json'), JSON.stringify({ reason: 'user_interaction_honk', city: 'Madrid' }));
   // same event, but the front camera (the master by default) is undecodable garbage
   badFront = join(root, 'bad', 'TeslaCam'); const b = join(badFront, 'SavedClips', TS); mkdirSync(b, { recursive: true });
-  for (const c of CAMS) writeFileSync(join(b, `${TS}-${c}.mp4`), c === 'front' ? Buffer.alloc(4096, 7) : clip);
+  for (const c of CAMS) writeFileSync(join(b, `${TS}-${c}.mp4`), c === 'front' ? Buffer.alloc(20000, 7) : clip);
   writeFileSync(join(b, 'event.json'), JSON.stringify({ reason: 'user_interaction_honk', city: 'Madrid' }));
 });
 test.afterAll(() => rmSync(root, { recursive: true, force: true }));

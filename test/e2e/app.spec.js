@@ -54,7 +54,7 @@ test('camera grid: 6 cameras in a 3x2 spatial layout, 4 in a 3x2 without pillars
   await load(page);
   await open(page, '2026-03-02_10-00-00');
   await expect(page.locator('#grid .cam')).toHaveCount(6);
-  const box = async (name) => (await page.locator('#grid .cam', { hasText: name }).boundingBox());
+  const box = async (name) => (await page.locator('#grid .cam', { hasText: new RegExp('^' + name) }).boundingBox());
   const [front, back, left, right, lp, rp] = await Promise.all(['Front', 'Back', 'Left', 'Right', 'L pillar', 'R pillar'].map(box));
   // pillars flank the front camera on the top row, repeaters flank the back camera on the bottom row
   expect(Math.abs(lp.y - front.y)).toBeLessThan(2); expect(lp.x).toBeLessThan(front.x); expect(rp.x).toBeGreaterThan(front.x);
@@ -68,7 +68,7 @@ test('camera grid: 6 cameras in a 3x2 spatial layout, 4 in a 3x2 without pillars
 test('click a camera to enlarge it and click again to restore the grid', async ({ page }) => {
   await load(page);
   await open(page, '2026-03-02_10-00-00');
-  const back = page.locator('#grid .cam', { hasText: 'Back' });
+  const back = page.locator('#grid .cam', { hasText: /^Back/ });
   await back.click();
   await expect(page.locator('#grid')).toHaveClass(/\bfocus\b/);
   await expect(back).toHaveClass(/\bmain\b/);
@@ -395,7 +395,7 @@ for (const [W, H] of [[1920, 1080], [1440, 900]]) {
     let g = await geometry(page);
     assertUncropped(g); expect(covered(g)).toBeGreaterThanOrEqual(oldCovered(g) - 0.005);
     // focus view: one tile, still uncropped, bigger than any grid tile
-    await page.locator('#grid .cam', { hasText: 'Back' }).click();
+    await page.locator('#grid .cam', { hasText: /^Back/ }).click();
     const f = await geometry(page);
     expect(f.tiles).toHaveLength(1); assertUncropped(f);
     const back = g.tiles.find((t) => t.cam === 'back');
@@ -452,7 +452,7 @@ test('phone portrait 390x844: main camera fills its area, thumbnails keep aspect
   expect(Math.abs(main.r.w - 390)).toBeLessThan(2);            // full width: no pillarbox
   expect(Math.abs(main.r.w / main.r.h - 4 / 3)).toBeLessThan(0.02);
   for (const t of g.tiles) { expect(t.fit).toBe('contain'); expect(Math.abs(t.r.w / t.r.h - 4 / 3)).toBeLessThan(0.03); expect(Math.abs(t.v.w - t.r.w)).toBeLessThan(2.5); }
-  await page.locator('#grid .cam', { hasText: 'Back' }).click();
+  await page.locator('#grid .cam', { hasText: /^Back/ }).click();
   const swapped = await geometry(page);
   expect(swapped.tiles.find((t) => t.cam === 'back').r.w).toBeGreaterThan(380);
   await setOpt(page, '#layout', 'focus');

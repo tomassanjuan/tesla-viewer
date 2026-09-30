@@ -1,4 +1,4 @@
-import { groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
+import { isJunkName, looksLikeMp4OrTesla, groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
 import { parseClipBlob, probeSei } from './mp4.js';
 import { typeIcon } from './icons.js';
@@ -37,13 +37,17 @@ const resolve = (f) => decrypted.get(f) ?? f;
 
 // ---------- loading ----------
 async function addFiles(list) {
-  const items = [...list].map((f) => ({ path: f.webkitRelativePath || f.path || f.name, file: f }));
-  const scan = busy.begin('Scanning files', items.length);
+  const all = [...list].filter((f) => !isJunkName(f.webkitRelativePath || f.path || f.name));   // macOS `._*` sidecars, .DS_Store: never clips, never logged
+  const scan = busy.begin('Scanning files', all.length);
+  const items = [];
   try {
-  for (const [i, { file }] of items.entries()) {
+  for (const [i, file] of all.entries()) {
     scan.set(i + 1);
-    if (!/\.mp4$/i.test(file.name)) continue;
+    const path = file.webkitRelativePath || file.path || file.name;
+    if (!/\.mp4$/i.test(file.name)) { items.push({ path, file }); continue; }
     const head = new Uint8Array(await file.slice(0, 0x2000).arrayBuffer());
+    if (!looksLikeMp4OrTesla(head, file.size)) continue;   // empty / tiny non-mp4 (e.g. a truncated copy): not a clip
+    items.push({ path, file });
     try { encrypted.set(file, parseHeader(head, file.size)); } catch (e) { if (e.code === 'TruncatedFile' || e.code === 'UnsupportedVersion') console.warn(file.name, e.message); }
   }
   events = groupFiles(items);
@@ -117,9 +121,13 @@ $('groupby').onchange = (e) => { groupBy = e.target.value; savePref('groupBy', g
 $('sortby').onchange = (e) => { sortBy = e.target.value; savePref('sortBy', sortBy); renderEvents(); };
 
 const thumbUrls = [];
+const setThumb = (im) => { const u = URL.createObjectURL(im._thumb); thumbUrls.push(u); im.src = u; };
+const thumbObs = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((es) => {
+  for (const x of es) if (x.isIntersecting) { thumbObs.unobserve(x.target); setThumb(x.target); }
+}, { rootMargin: '200px' });
 function renderEvents() {
   renderFilters();
-  teleObs?.disconnect();
+  teleObs?.disconnect(); thumbObs?.disconnect();
   $('events').innerHTML = '';
   for (const u of thumbUrls.splice(0)) URL.revokeObjectURL(u);
   const shown = visibleEvents();
@@ -137,10 +145,9 @@ function renderEvents() {
       d.append(s);
     }
     if (e.thumb) {
-      const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
-      const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
-      im.className = 'ev-thumb';
-      d.prepend(im);
+      const im = Object.assign(document.createElement('img'), { alt: '' });   // object URL only once the card scrolls into view: thousands of clips must not decode at once
+      im.className = 'ev-thumb'; im._thumb = e.thumb;
+      d.prepend(im); thumbObs ? thumbObs.observe(im) : setThumb(im);
     }
     d.onclick = () => openEvent(e);
     d.onkeydown = (k) => { if (k.key === 'Enter' || k.key === ' ') { k.preventDefault(); openEvent(e); } };
@@ -186,7 +193,21 @@ function showTelemetry(e, el) {
   s.setAttribute('role', 'img'); s.setAttribute('aria-label', t('Telemetry available'));
   el.querySelector('.ttl').append(s);
 }
+// Background work (telemetry probes) yields to the player: nothing is read while a clip is loading or playing, and at most PROBE_MAX heads are read at once.
+let loadingClip = 0, probing = 0;
+const PROBE_MAX = 2, sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function bgSlot() {
+  while (loadingClip || playing || probing >= PROBE_MAX) await sleep(300);
+  probing++;
+}
 async function probeTelemetry(e, el = e._el) {
+  if (e.telemetry === undefined) {
+    await bgSlot();
+    try { await probeOne(e); } finally { probing--; }
+  }
+  if (el) showTelemetry(e, el);
+}
+async function probeOne(e) {
   if (e.telemetry === undefined) {
     // any cam of the first segment may carry the SEI (openEvent parses cams in the same order)
     const fs = CAMS.map((c) => e.segments[0].cams[c]).filter((f) => f && !(encrypted.has(f) && !decrypted.has(f)));
@@ -199,7 +220,6 @@ async function probeTelemetry(e, el = e._el) {
     try { for (const f of fs) if ((e.telemetry = await probe(f)) === true) break; } catch { e.telemetry = null; }
     if (!fs.length) e.telemetry = undefined;
   }
-  if (el) showTelemetry(e, el);
 }
 
 // Background probe of every clip so the Telemetry chip's count is complete: head reads only, 2 at a time, cache first.
@@ -260,6 +280,10 @@ let segIdx = 0, playing = false, wantPlay = false;
 let gapMode = 'skip', gapT = null, gapLast = 0; // 'skip' | 'through'; gapT = virtual global time while inside a gap
 
 async function openEvent(e) {
+  loadingClip++;
+  try { await openEventNow(e); } finally { loadingClip--; }
+}
+async function openEventNow(e) {
   for (const x of events) x._el?.classList.toggle('on', x === e);
   stop();
   const cams = CAMS.filter((c) => e.segments.some((s) => s.cams[c]));
@@ -453,7 +477,7 @@ async function loadSeg(i, at) {
   } finally { task.end(); }
   if (ctl.signal.aborted) return;   // superseded: the newer call finishes the job
   if (failed.length) $('vidwarn').textContent = `Could not load: ${failed.join(', ')}. Other cameras keep playing.`;
-  updateUi();
+  paintStates(); updateUi();
   if (wantPlay) playAll();
 }
 
