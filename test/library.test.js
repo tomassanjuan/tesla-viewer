@@ -40,3 +40,17 @@ test('a consistent repeating gap keeps clips in one group; a lone or irregular g
   const ev = groupFiles([0, 5, 10, 15, 50, 55].map(at));
   assert.deepEqual(ev.map((e) => e.segments.length).sort(), [2, 4]);
 });
+
+test('filterEvents free-text search: every word must match name, reason, place or city (case-insensitive)', async () => {
+  const { filterEvents } = await import('../js/library.js');
+  const evs = [
+    { name: '2026-03-04_09-00-00', info: { reason: 'Honk', place: 'Calle Mayor, Madrid' } },
+    { name: '2026-03-03_22-00-00', info: { reason: 'Sentry: object detected', place: 'Rue X, Paris' }, city: 'Paris' },
+    { name: '2026-03-02_10-00-00' },
+  ];
+  assert.equal(filterEvents(evs, { q: '' }).length, 3);
+  assert.equal(filterEvents(evs, { q: 'madrid' }).length, 1);
+  assert.equal(filterEvents(evs, { q: 'SENTRY paris' }).length, 1);
+  assert.equal(filterEvents(evs, { q: 'honk paris' }).length, 0);
+  assert.equal(filterEvents(evs, { q: '2026-03-02' })[0].name, '2026-03-02_10-00-00');
+});

@@ -59,8 +59,10 @@ export function countBy(events, fn) {
 }
 
 /** events filtered by category ('' = all) and type ('' = all). Events carry `reason` (raw event.json reason) once loaded. */
-export function filterEvents(events, { category = '', type = '' } = {}) {
-  return events.filter((e) => (!category || e.category === category) && (!type || eventType(e) === type));
+export function filterEvents(events, { category = '', type = '', q = '' } = {}) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const hay = (e) => [e.name, e.info?.reason, e.info?.place, e.city].filter(Boolean).join(' ').toLowerCase();
+  return events.filter((e) => (!category || e.category === category) && (!type || eventType(e) === type) && (!words.length || words.every((w) => hay(e).includes(w))));
 }
 
 /** files: [{path, file}] where path is the relative path (folders give event names). */

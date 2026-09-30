@@ -120,4 +120,5 @@ export default {
   "Show HUD": "HUDを表示",
   "Export enlarged cam only": "拡大したカメラのみ書き出す",
   "Edit blur": "ぼかしを編集",
+  "Search clips": "クリップを検索",
 };

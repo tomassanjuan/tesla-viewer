@@ -120,4 +120,5 @@ export default {
   "Show HUD": "显示 HUD",
   "Export enlarged cam only": "仅导出放大的摄像头",
   "Edit blur": "编辑模糊",
+  "Search clips": "搜索片段",
 };

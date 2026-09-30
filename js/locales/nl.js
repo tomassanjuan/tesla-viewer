@@ -120,4 +120,5 @@ export default {
   "Show HUD": "HUD tonen",
   "Export enlarged cam only": "Alleen vergrote camera exporteren",
   "Edit blur": "Vervaging bewerken",
+  "Search clips": "Zoek clips",
 };
