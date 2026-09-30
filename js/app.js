@@ -47,13 +47,13 @@ async function addFiles(list) {
   scan.set(0, events.length, 'Reading events');
   for (const [i, e] of events.entries()) if (scan.set(i + 1), e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
   } finally { scan.end(); }
-  filter.category = ''; filter.type = '';
+  filter.category = ''; filter.type = ''; filter.q = ''; $('q').value = '';
   renderEvents();
   updateCryptUi();
   if (events.length) openEvent(visibleEvents()[0] ?? events[0]);
 }
 
-const filter = { category: '', type: '' };
+const filter = { category: '', type: '', q: '' };
 const pref = (k, ok, d) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : d; } catch { return d; } };
 const savePref = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode: not persisted */ } };
 let groupBy = pref('groupBy', GROUPS, 'day'), sortBy = pref('sortBy', SORTS, 'newest');
@@ -83,9 +83,12 @@ function renderFilters() {
     b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
     tbox.append(b);
   }
-  $('libctl').hidden = !events.length;
+  $('libopts').hidden = $('q').hidden = !events.length;
+  const on = (id) => $(id).querySelector('.on')?.textContent ?? '';
+  $('libsum').textContent = [groupBy === 'none' ? t('No grouping') : on('groupby'), on('sortby')].join(' · ');
 }
 document.addEventListener('langchange', () => events.length && renderEvents());
+$('q').oninput = (e) => { filter.q = e.target.value; renderEvents(); };
 $('groupby').onchange = (e) => { groupBy = e.target.value; savePref('groupBy', groupBy); renderEvents(); };
 $('sortby').onchange = (e) => { sortBy = e.target.value; savePref('sortBy', sortBy); renderEvents(); };
 

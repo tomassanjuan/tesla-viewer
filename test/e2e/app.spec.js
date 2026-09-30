@@ -27,6 +27,7 @@ const evt = (page, text) => page.locator('#events .ev', { hasText: text });
 const chip = (page, sel, text) => page.locator(`${sel} button`, { hasText: text });
 // #layout/#units/#groupby are <select>s or button groups (js/seg.js); both expose .value, so drive them either way.
 const setOpt = async (page, id, v) => {
+  if (/groupby|sortby/.test(id)) await page.locator('#libopts').evaluate((d) => { d.open = true; });
   const b = page.locator(`${id} [data-v="${v}"]`);
   if (await b.count()) await b.click(); else await page.locator(id).selectOption(v);
 };
@@ -265,4 +266,28 @@ test('timeline ticks sit where the telemetry event happens (multi-clip trip)', a
       expect(Math.abs(xs[i] - thumb), `tick ${i} at ${t}s`).toBeLessThan(2);
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('sidebar toggle keeps the main area full width, with and without a resized sidebar', async ({ page }) => {
+  const main = () => page.locator('main').evaluate((el) => Math.round(el.getBoundingClientRect().width));
+  const toggle = page.locator('#sideToggle');
+  const vw = 1280;
+  for (const side of [300, 460]) {
+    await page.evaluate((w) => document.documentElement.style.setProperty('--side-w', w + 'px'), side);
+    expect(await main()).toBeGreaterThan(vw - side - 4);
+    await toggle.click();
+    await expect(page.locator('html')).toHaveClass(/side-off/);
+    expect(await main()).toBeGreaterThan(vw - 4);
+    await toggle.click();
+    await expect(page.locator('html')).not.toHaveClass(/side-off/);
+    expect(await main()).toBeGreaterThan(vw - side - 4);
+    expect(await main()).toBeLessThan(vw - side + 4);
+  }
+});
+
+test('collapsed sidebar persists across reload with a saved width', async ({ page }) => {
+  await page.evaluate(() => { localStorage.setItem('tv-side', '0'); localStorage.setItem('tv-side-w', '420'); });
+  await page.reload();
+  await expect(page.locator('html')).toHaveClass(/side-off/);
+  expect(await page.locator('main').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(1270);
 });
