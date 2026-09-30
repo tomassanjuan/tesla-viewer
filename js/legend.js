@@ -12,12 +12,12 @@ export const TICKS = {
   brake: { color: '#e31937', label: 'Hard braking' },
   accel: { color: '#f5a524', label: 'Hard acceleration' },
   turn: { color: '#a78bfa', label: 'Sharp turn' },
-  'ap-on': { color: '#3ecf8e', label: 'Autopilot engaged' },
+  'ap-on': { color: '#5aa9ff', label: 'Autopilot engaged' },
   'ap-off': { color: '#8b93a1', label: 'Autopilot disengaged' },
 };
 
 // Turn indicators: one definition (color, label, arrow path in a 24x24 box) for the HUD icons, timeline lane, tooltips and legend.
-export const SIGNAL_COLOR = '#f472b6';
+export const SIGNAL_COLOR = '#22e05a';
 export const SIGNALS = {
   left: { color: SIGNAL_COLOR, label: 'Left indicator', path: 'M10 4L2 12l8 8v-5h12V9H10z' },
   right: { color: SIGNAL_COLOR, label: 'Right indicator', path: 'M14 4l8 8-8 8v-5H2V9h12z' },
