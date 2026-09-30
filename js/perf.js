@@ -50,7 +50,8 @@ export function initPerf(api) {
     for (const [id, v] of Object.entries(api.vids)) {
       if (!v.src || !v.getVideoPlaybackQuality) continue;
       const q = v.getVideoPlaybackQuality(), p = prev[id] ?? { totalVideoFrames: 0, droppedVideoFrames: 0 };
-      lines.push(`${id.padEnd(15)} drop ${dropRate(p, q).toFixed(0).padStart(3)}%  (${q.droppedVideoFrames}/${q.totalVideoFrames})`);
+      const idle = v.paused || q.totalVideoFrames <= p.totalVideoFrames;
+      lines.push(`${id.padEnd(15)} ${idle ? 'paused' : `drop ${dropRate(p, q).toFixed(0).padStart(3)}%`}`);
       prev[id] = { totalVideoFrames: q.totalVideoFrames, droppedVideoFrames: q.droppedVideoFrames };
     }
     out.textContent = `${hw}\n${lines.join('\n')}`;
