@@ -98,7 +98,7 @@ export function writeTurnTrip(root) {
     const at = TURN_TRIP.spikes.map((t) => (t - i * 10) * 30).find((f) => f >= 0 && f < 300);
     const ts = minute(TURN_TRIP.name, i);
     const p = join(cam, `RecentClips/${ts}-front.mp4`); mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, makeClip({ frames: 300, ay: (f) => (at !== undefined && f >= at && f < at + 10 ? 6 : 0),
+    writeFileSync(p, makeClip({ frames: 300, ay: (f) => (at !== undefined && Math.abs(f - at) < 15 ? 6 : 0) /* 1 s plateau centred on the peak */,
       blinkL: (f) => (i === 1 && f >= TURN_TRIP.signals.left[0] && f < TURN_TRIP.signals.left[1] ? 1 : 0),
       blinkR: (f) => (i === 2 && f >= TURN_TRIP.signals.right[0] && f < TURN_TRIP.signals.right[1] ? 1 : 0) }));
   }
