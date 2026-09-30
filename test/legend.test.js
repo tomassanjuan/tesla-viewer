@@ -32,3 +32,12 @@ test('legend mount point and swatch styles exist', () => {
   const css = read('style.css');
   for (const k of new Set(LEGEND.flatMap((g) => g.items.map((i) => i.kind)))) assert.ok(css.includes(`.lg-${k}`), `.lg-${k} missing`);
 });
+
+test('throttle has its own color token, distinct from speed/AP/brake, used by the graph lane and HUD bar', () => {
+  assert.equal(COLOR.throttle, '--throttle');
+  assert.ok(![COLOR.speed, COLOR.ap, COLOR.brake].includes(COLOR.throttle));
+  const css = read('style.css');
+  assert.equal(css.match(/--throttle:/g).length, 3, 'defined in dark, light and auto-light themes');
+  assert.ok(css.includes('background:var(--throttle)'), 'HUD throttle bar uses the token');
+  assert.match(read('js/graph.js'), /THR_LANE/);
+});
