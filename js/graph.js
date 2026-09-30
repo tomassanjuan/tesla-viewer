@@ -47,6 +47,7 @@ export function spans(samples, pred) {
 }
 
 // ---------- DOM part ----------
+const THR_LANE = 40; // px height of the throttle/brake lane under the speed curve
 const GEAR = ['P', 'D', 'R', 'N'], AP = ['Off', 'Self-driving', 'Autosteer', 'TACC'];
 
 export function createGraph(canvas, opts = {}) {
@@ -59,7 +60,7 @@ export function createGraph(canvas, opts = {}) {
   const tip = document.createElement('div'); tip.className = 'gr-tip'; tip.hidden = true; wrap.appendChild(tip);
   if (!document.getElementById('gr-style')) {
     const st = document.createElement('style'); st.id = 'gr-style';
-    st.textContent = '.gr-wrap{position:relative;flex:1;min-width:0;height:150px}.gr-wrap>canvas{width:100%!important;height:100%!important;aspect-ratio:auto!important;display:block;touch-action:none;cursor:crosshair}' +
+    st.textContent = '.gr-wrap{position:relative;flex:1;min-width:0;height:180px}.gr-wrap>canvas{width:100%!important;height:100%!important;aspect-ratio:auto!important;display:block;touch-action:none;cursor:crosshair}' +
       '.gr-tip{position:absolute;top:4px;left:0;pointer-events:none;background:var(--surface,#181b22);color:var(--fg,#e8eaed);border:1px solid var(--border,var(--b,#2a2f3a));border-radius:6px;padding:3px 7px;font:11px system-ui,sans-serif;white-space:nowrap;z-index:2}.gr-tip[hidden]{display:none}';
     document.head.appendChild(st);
   }
@@ -67,7 +68,7 @@ export function createGraph(canvas, opts = {}) {
   const mph = () => units === 'mph', conv = (mps) => mps * (mph() ? 2.23694 : 3.6);
 
   function layout() {
-    const padL = 34, padR = 8, padT = 6, axisB = 16, strips = ev?.samples.some((s) => s.accel > 0 || s.brake) ? 12 : 0;
+    const padL = 34, padR = 8, padT = 6, axisB = 16, strips = ev?.samples.some((s) => s.accel > 0 || s.brake) ? THR_LANE : 0;
     return { x0: padL, x1: Math.max(padL + 10, W - padR), y0: padT, y1: H - axisB - strips - 3, sy0: H - axisB - strips, sy1: H - axisB };
   }
 
@@ -115,13 +116,17 @@ export function createGraph(canvas, opts = {}) {
       x.lineTo(X(run[run.length - 1].t), Y(0)); x.lineTo(X(run[0].t), Y(0)); x.closePath();
       x.fillStyle = fg; x.globalAlpha = 0.1; x.fill(); x.globalAlpha = 1;
     }
-    // throttle (up, 0..1) and brake strips
+    // throttle lane: own 0..100% scale under the speed curve, brake drawn as full-height bars in the same lane
     if (L.sy1 > L.sy0 + 4) {
-      const mid = (L.sy0 + L.sy1) / 2, h = (L.sy1 - L.sy0) / 2, bw = Math.max(1, pw / S.length * 1.5);
-      x.globalAlpha = 0.85;
-      x.fillStyle = thr; for (const s of S) if (s.accel > 0.01) { const a = h * Math.min(1, s.accel); x.fillRect(X(s.t), mid - a, bw, a); }
-      x.fillStyle = brake; for (const s of S) if (s.brake) x.fillRect(X(s.t), mid + 1, bw, h - 1);
-      x.globalAlpha = 1;
+      const h = L.sy1 - L.sy0, bw = Math.max(1, pw / S.length * 1.5);
+      x.fillStyle = thr; x.globalAlpha = 0.08; x.fillRect(L.x0, L.sy0, pw, h);
+      x.globalAlpha = 0.9; x.fillStyle = thr;
+      for (const s of S) if (s.accel > 0.01) { const a = h * Math.min(1, s.accel); x.fillRect(X(s.t), L.sy1 - a, bw, a); }
+      x.fillStyle = brake; x.globalAlpha = 0.75;
+      for (const s of S) if (s.brake) x.fillRect(X(s.t), L.sy0, bw, h);
+      x.globalAlpha = 1; x.strokeStyle = grid; x.beginPath(); x.moveTo(L.x0, Math.round(L.sy0) - 0.5); x.lineTo(L.x1, Math.round(L.sy0) - 0.5); x.stroke();
+      x.fillStyle = thr; x.textAlign = 'right'; x.fillText('100%', L.x0 - 4, L.sy0 + 5); x.fillText('0', L.x0 - 4, L.sy1 - 4);
+      x.textAlign = 'left'; x.fillText(t('Throttle'), L.x0 + 4, L.sy0 + 7);
     }
     // legend chip
     if (apSpans.length) {
@@ -135,7 +140,7 @@ export function createGraph(canvas, opts = {}) {
     // tooltip
     const s = hover != null && nearest(hover);
     if (s && Math.abs(s.t - hover) < gapT) {
-      tip.textContent = `${fmtTime(hover)} · ${Math.round(conv(s.speedMps))} ${mph() ? 'mph' : 'km/h'} · ${GEAR[s.gear] ?? '?'}${s.autopilot ? ' · ' + (AP[s.autopilot] ?? 'AP') : ''}`;
+      tip.textContent = `${fmtTime(hover)} · ${Math.round(conv(s.speedMps))} ${mph() ? 'mph' : 'km/h'} · ${GEAR[s.gear] ?? '?'}${s.autopilot ? ' · ' + (AP[s.autopilot] ?? 'AP') : ''} · ${t('Throttle')} ${Math.round(Math.min(1, s.accel || 0) * 100)}%${s.brake ? ' · ' + t('Brake') : ''}`;
       tip.hidden = false;
       const tw = tip.offsetWidth; tip.style.left = Math.max(0, Math.min(W - tw, X(hover) - tw / 2)) + 'px';
     } else tip.hidden = true;
