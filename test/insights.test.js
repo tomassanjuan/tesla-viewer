@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze, formatSummary, haversine } from '../js/insights.js';
+import { analyze, formatSummary, haversine, signalSpans, signalText } from '../js/insights.js';
 import { groupFiles, formatEventInfo } from '../js/library.js';
 
 // steady 20 m/s drive due north for 60 s at 1 Hz (~1 deg lat = 111195 m)
@@ -106,4 +106,13 @@ test('hard acceleration needs throttle; turn and accel tooltips say why', async 
   assert.match(tickText(a(0.5).markers[0]), /^Hard acceleration 4\.0 m\/s² · throttle 50% · 0:2\d$/);
   const r = analyze(drive(61, (t) => (t >= 10 && t <= 12 ? { ay: -3, steering: -72 } : {})));
   assert.match(tickText(r.markers[0]), /^Sharp turn 3\.0 m\/s² · steering -72° · 0:1\d$/);
+});
+
+test('signalSpans: merges blinker flicker, keeps sides separate, sorted', () => {
+  const flicker = [23, 23.5, 24.5, 25, 26, 26.5, 27]; // blinker ticking on/off at 2 Hz sampling: one span
+  const S = drive(61, () => ({})).flatMap((s) => [s, { ...s, t: s.t + 0.5 }]).map((s) => ({ ...s, blinkerLeft: flicker.includes(s.t) || (s.t >= 31 && s.t <= 31.5), blinkerRight: s.t >= 40 && s.t <= 41 }));
+  assert.deepEqual(signalSpans(S), [{ side: 'left', start: 23, end: 27 }, { side: 'left', start: 31, end: 31.5 }, { side: 'right', start: 40, end: 41 }]);
+  assert.deepEqual(analyze(S).signals, signalSpans(S));
+  assert.deepEqual(signalSpans(drive(10)), []);
+  assert.equal(signalText({ side: 'left', start: 23, end: 31 }), 'Left indicator 0:23 to 0:31');
 });
