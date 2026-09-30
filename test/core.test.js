@@ -168,19 +168,7 @@ test('groupEvents by day / city; formatEventInfo city', async () => {
   assert.equal(formatEventInfo({ city: ' Oslo ', street: 'X' }).city, 'Oslo');
 });
 
-test('hasSei: probes head for a Tesla SEI before the first slice', async () => {
-  const { hasSei } = await import('../js/mp4.js');
-  const box = (type, payload) => { const b = new Uint8Array(8 + payload.length); new DataView(b.buffer).setUint32(0, b.length); b.set([...type].map((c) => c.charCodeAt(0)), 4); b.set(payload, 8); return b; };
-  const nal = (bytes) => { const n = new Uint8Array(4 + bytes.length); new DataView(n.buffer).setUint32(0, bytes.length); n.set(bytes, 4); return n; };
-  const cat = (...a) => { const o = new Uint8Array(a.reduce((n, x) => n + x.length, 0)); let p = 0; for (const x of a) { o.set(x, p); p += x.length; } return o; };
-  const sei = nal([6, 5, 0x99, 0x42, 0x42, 0x69, 0x08, 0x96, 0x01, 0x80]);   // field 1 varint = 150
-  const slice = nal([0x65, 0, 0, 0, 0]);
-  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', cat(sei, slice))).buffer), true);
-  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4)), box('mdat', slice)).buffer), false);
-  assert.equal(hasSei(cat(box('ftyp', new Uint8Array(4))).buffer), null);
-});
-
-test('probeSei: finds mdat behind a large moov by reading box headers only', async () => {
+test('probeSei: box headers to mdat, NAL hops past big slices, first frame may lack SEI', async () => {
   const { probeSei } = await import('../js/mp4.js');
   const box = (type, payload) => { const b = new Uint8Array(8 + payload.length); new DataView(b.buffer).setUint32(0, b.length); b.set([...type].map((c) => c.charCodeAt(0)), 4); b.set(payload, 8); return b; };
   const nal = (bytes) => { const n = new Uint8Array(4 + bytes.length); new DataView(n.buffer).setUint32(0, bytes.length); n.set(bytes, 4); return n; };
@@ -190,6 +178,9 @@ test('probeSei: finds mdat behind a large moov by reading box headers only', asy
   assert.equal(await probeSei(mk(cat(sei, slice))), true);
   assert.equal(await probeSei(mk(slice)), false);
   assert.equal(await probeSei(new Blob([box('ftyp', new Uint8Array(4))])), null);
+  const bigIdr = nal([0x65, ...new Uint8Array(300000)]);   // no SEI on frame 0; the first SEI sits after a 300 KB slice
+  assert.equal(await probeSei(mk(cat(bigIdr, sei, nal([0x41, 1])))), true);
+  assert.equal(await probeSei(mk(cat(bigIdr, nal([0x41, 1])))), false);
 });
 
 test('sortEvents and groupEvents: month / type / kind / cams / length', async () => {
