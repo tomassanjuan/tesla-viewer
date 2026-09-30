@@ -348,6 +348,19 @@ canvas{background:transparent}
   #app.dash #stage{display:block}
 }
 
+/* ---------- legend ---------- */
+.legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4);padding:var(--s2) var(--s4) var(--s3);background:var(--bg);font-size:11px;color:var(--mut)}
+.lg-group{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s1) var(--s3)}
+.lg-group>b{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.lg-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.lg-sw{display:inline-block;flex:none;width:16px;height:10px;box-sizing:border-box;background:var(--c)}
+.lg-line{height:3px;border-radius:2px}
+.lg-band{opacity:.5;border-radius:2px}
+.lg-bar{width:6px;height:10px;border-radius:1px}
+.lg-hatch{background:repeating-linear-gradient(45deg,var(--c),var(--c) 2px,transparent 2px,transparent 4px);border-radius:2px}
+.lg-dot{width:10px;border-radius:50%;border:1.5px solid #fff}
+@media (max-width:860px){.legend{padding:var(--s2) var(--s4) var(--s5);gap:var(--s2) var(--s3)}.lg-group{width:100%}}
+
 /* shared busy bar (js/progress.js): fixed strip on top, safe-area aware for phones */
 #busy{position:fixed;top:0;left:0;right:0;z-index:50;padding:calc(6px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 6px max(12px,env(safe-area-inset-left));background:var(--bg,#111);color:var(--fg,#eee);font-size:12px;box-shadow:0 1px 6px #0006;pointer-events:none}
 #busy[hidden]{display:none}

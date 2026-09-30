@@ -7,6 +7,7 @@ import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
 import { createGraph } from './graph.js';
 import { t } from './i18n.js';
+import { renderLegend } from './legend.js';
 import { seg } from './seg.js';
 import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
@@ -21,6 +22,7 @@ const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repea
 
 const busy = mountBusy();
 const map = createMap($('map'));
+renderLegend($('legend')); document.addEventListener('langchange', () => renderLegend($('legend')));
 const graph = createGraph($('graph'), { seek: (t) => ev && seekGlobal(t) });
 $('tiles').onchange = (e) => map.setTiles(e.target.checked);
 let events = [], ev = null, focusCam = 'front';
