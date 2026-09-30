@@ -405,6 +405,7 @@ let dashT = 0, dashLast = 0;
 const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
 const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
+const LOAD_MS = +new URLSearchParams(location.search).get('loadms') || 8000;   // per-cam load timeout; ?loadms= lets tests shorten it
 let loadCtl;   // aborts the previous loadSeg when a newer one starts (seek/scrub/auto-advance/new clip), so its busy task always ends
 async function loadSeg(i, at) {
   loadCtl?.abort(); const ctl = loadCtl = new AbortController();
@@ -417,7 +418,7 @@ async function loadSeg(i, at) {
       if (v.src) URL.revokeObjectURL(v.src);
       if (!f || (encrypted.has(f) && !decrypted.has(f))) { v.removeAttribute('src'); v.load(); return; }
       v.src = URL.createObjectURL(resolve(f));
-      const r = await waitLoaded(v, { signal: ctl.signal });
+      const r = await waitLoaded(v, { signal: ctl.signal, ms: LOAD_MS });
       if (r === 'ok') { v.currentTime = at; v.playbackRate = +$('speed').value; }
       else if (r !== 'aborted') failed.push(`${NAMES[c]} (${r})`);
     }));
