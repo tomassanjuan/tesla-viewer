@@ -104,3 +104,15 @@ export function writeTurnTrip(root) {
   }
   return cam;
 }
+
+/** A 2-minute SavedClips event (2 x 60 s, front SEI) whose event.json says automatic emergency braking 75 s after the first clip starts. */
+export const AEB_EVENT = { name: '2026-05-01_12-00-00', triggerAt: '2026-05-01T12:01:15', triggerS: 75 };
+export function writeAebEvent(root) {
+  const cam = join(root, 'TeslaCam');
+  for (let i = 0; i < 2; i++) {
+    const p = join(cam, `SavedClips/${AEB_EVENT.name}/${minute(AEB_EVENT.name, i)}-front.mp4`); mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, makeClip({ frames: 1800 }));
+  }
+  writeFileSync(join(cam, `SavedClips/${AEB_EVENT.name}/event.json`), JSON.stringify({ timestamp: AEB_EVENT.triggerAt, city: 'Madrid', reason: 'vehicle_auto_emergency_braking', camera: '0' }));
+  return cam;
+}
