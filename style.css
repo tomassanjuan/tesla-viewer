@@ -216,7 +216,7 @@ canvas{background:transparent}
 .seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-pill)}
 .seg button{font:inherit;font-size:12px;font-weight:500;color:var(--mut);background:none;border:0;border-radius:var(--r-pill);padding:0 var(--s3);min-height:30px;cursor:pointer;text-transform:none;letter-spacing:0}
 .seg button:hover{color:var(--fg)}
-.seg button.on{background:var(--accent);color:var(--on-accent)}
+.seg button.on,.seg button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
 .seg button:focus-visible{outline:none;box-shadow:var(--ring)}
 #lang button{padding:0 var(--s2);min-width:34px}
 
