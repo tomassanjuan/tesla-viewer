@@ -1,5 +1,6 @@
 // Map panel: OpenStreetMap tiles by default (toggle, persisted); offline canvas track when off/offline/tile fails.
 import { t } from './i18n.js';
+import { COLOR, ROUTE_AHEAD } from './legend.js';
 const css = (v) => (typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888' : '#888');
 const TS = 256;
 
@@ -115,10 +116,10 @@ export function createMap(canvas) {
       x.strokeStyle = col; x.lineWidth = lw; x.lineJoin = 'round'; x.beginPath();
       arr.forEach((p, i) => { const [a, c] = P(p); i ? x.lineTo(a, c) : x.moveTo(a, c); }); x.stroke();
     };
-    line(pts.slice(ci), 'rgba(139,147,161,.55)', 2); // future, dimmed
-    line(pts.slice(0, ci + 1), css('--info'), 3); // trail so far
+    line(pts.slice(ci), ROUTE_AHEAD, 2); // future, dimmed
+    line(pts.slice(0, ci + 1), css(COLOR.trail), 3); // trail so far
     const [a, c] = P(me);
-    x.save(); x.translate(a, c); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.fillStyle = css('--accent'); x.beginPath();
+    x.save(); x.translate(a, c); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.fillStyle = css(COLOR.position); x.beginPath();
     if (typeof me.heading === 'number' && isFinite(me.heading)) {
       x.rotate((me.heading * Math.PI) / 180); x.moveTo(0, -8); x.lineTo(5, 6); x.lineTo(0, 3); x.lineTo(-5, 6); x.closePath();
     } else x.arc(0, 0, 4, 0, 7);
