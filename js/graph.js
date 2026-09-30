@@ -1,5 +1,6 @@
 // Telemetry graph: DPR-aware canvas, axes, AP bands, throttle/brake strips, playhead, hover + click/drag seek.
 import { t } from './i18n.js';
+import { COLOR } from './legend.js';
 
 // ---------- pure helpers ----------
 /** "Nice" tick values covering [min,max] with roughly `count` ticks. */
@@ -79,7 +80,7 @@ export function createGraph(canvas, opts = {}) {
     if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
     const x = canvas.getContext('2d');
     x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, W, H);
-    const fg = css('--fg', '#e8eaed'), mut = css('--mut', '#8b93a1'), grid = css('--border', css('--b', '#2a2f3a')), acc = css('--accent', css('--acc', '#e31937')), info = css('--info', '#5aa9ff');
+    const fg = css(COLOR.speed, '#e8eaed'), mut = css('--mut', '#8b93a1'), grid = css('--border', css('--b', '#2a2f3a')), brake = css(COLOR.brake, '#e31937'), playhead = css(COLOR.playhead, '#e31937'), ap = css(COLOR.ap, '#5aa9ff'), thr = css(COLOR.throttle, '#5aa9ff');
     x.font = '10px system-ui,sans-serif'; x.textBaseline = 'middle';
     if (!ev?.samples.length || !(ev.total > 0)) {
       x.fillStyle = mut; x.textAlign = 'center'; x.font = '12px system-ui,sans-serif';
@@ -99,9 +100,9 @@ export function createGraph(canvas, opts = {}) {
     for (const tm of tt) { const px = X(tm), lw = x.measureText(fmtTime(tm)).width / 2; x.textAlign = 'center'; x.fillText(fmtTime(tm), Math.min(W - lw, Math.max(L.x0 - 6 + lw, px)), H - 7); }
     x.textAlign = 'left'; x.fillText(mph() ? 'mph' : 'km/h', L.x0 + 4, L.y0 + 6);
     // autopilot bands
-    const ap = spans(S, (s) => s.autopilot), minW = Math.max(0.3, total / pw * 2);
-    x.fillStyle = info; x.globalAlpha = 0.16;
-    for (const [a, b] of ap) x.fillRect(X(a), L.y0, Math.max(2, X(Math.max(b, a + minW)) - X(a)), L.sy1 - L.y0);
+    const apSpans = spans(S, (s) => s.autopilot), minW = Math.max(0.3, total / pw * 2);
+    x.fillStyle = ap; x.globalAlpha = 0.16;
+    for (const [a, b] of apSpans) x.fillRect(X(a), L.y0, Math.max(2, X(Math.max(b, a + minW)) - X(a)), L.sy1 - L.y0);
     x.globalAlpha = 1;
     // speed line + area, broken across telemetry gaps
     const dts = S.slice(1).map((s, i) => s.t - S[i].t).sort((a, b) => a - b), gapT = Math.max(1, (dts[dts.length >> 1] || 0.03) * 5);
@@ -118,19 +119,19 @@ export function createGraph(canvas, opts = {}) {
     if (L.sy1 > L.sy0 + 4) {
       const mid = (L.sy0 + L.sy1) / 2, h = (L.sy1 - L.sy0) / 2, bw = Math.max(1, pw / S.length * 1.5);
       x.globalAlpha = 0.85;
-      x.fillStyle = info; for (const s of S) if (s.accel > 0.01) { const a = h * Math.min(1, s.accel); x.fillRect(X(s.t), mid - a, bw, a); }
-      x.fillStyle = acc; for (const s of S) if (s.brake) x.fillRect(X(s.t), mid + 1, bw, h - 1);
+      x.fillStyle = thr; for (const s of S) if (s.accel > 0.01) { const a = h * Math.min(1, s.accel); x.fillRect(X(s.t), mid - a, bw, a); }
+      x.fillStyle = brake; for (const s of S) if (s.brake) x.fillRect(X(s.t), mid + 1, bw, h - 1);
       x.globalAlpha = 1;
     }
     // legend chip
-    if (ap.length) {
+    if (apSpans.length) {
       const lab = t('Autopilot'), w = x.measureText(lab).width + 12;
-      x.fillStyle = info; x.globalAlpha = 0.25; x.fillRect(L.x1 - w - 2, L.y0 + 1, w, 13); x.globalAlpha = 1;
+      x.fillStyle = ap; x.globalAlpha = 0.25; x.fillRect(L.x1 - w - 2, L.y0 + 1, w, 13); x.globalAlpha = 1;
       x.fillStyle = fg; x.textAlign = 'center'; x.fillText(lab, L.x1 - w / 2 - 2, L.y0 + 7.5);
     }
     // hover + playhead
     if (hover != null) { const px = Math.round(X(hover)) + 0.5; x.strokeStyle = mut; x.lineWidth = 1; x.beginPath(); x.moveTo(px, L.y0); x.lineTo(px, L.sy1); x.stroke(); }
-    x.strokeStyle = acc; x.lineWidth = 2; x.beginPath(); x.moveTo(X(cur), L.y0); x.lineTo(X(cur), L.sy1); x.stroke();
+    x.strokeStyle = playhead; x.lineWidth = 2; x.beginPath(); x.moveTo(X(cur), L.y0); x.lineTo(X(cur), L.sy1); x.stroke();
     // tooltip
     const s = hover != null && nearest(hover);
     if (s && Math.abs(s.t - hover) < gapT) {

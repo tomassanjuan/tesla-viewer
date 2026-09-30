@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { latLonToTile, fitZoom, fitZoomFrac, unproject, project, tilesForView, bounds, splitRoute, ROUTE_COLORS } from '../js/map.js';
+import { latLonToTile, fitZoom, fitZoomFrac, unproject, project, tilesForView, bounds, splitRoute } from '../js/map.js';
 
 test('latLonToTile known values', () => {
   assert.deepEqual(latLonToTile(0, 0, 1), { x: 1, y: 1, z: 1 });
@@ -43,7 +43,4 @@ test('splitRoute splits by time, even when cur has no GPS point of its own', () 
   assert.equal(splitRoute(pts, { t: -1 }).ci, 0);
   assert.equal(splitRoute(pts, { t: 99 }).ahead.length, 1);
   assert.equal(splitRoute(pts, pts[3]).ci, 3);
-});
-test('ROUTE_COLORS exposes Driven/Ahead css vars for the legend', () => {
-  assert.deepEqual(Object.values(ROUTE_COLORS).map((c) => c.label), ['Driven', 'Ahead']);
 });

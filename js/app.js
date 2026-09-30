@@ -2,11 +2,13 @@ import { groupFiles, groupEvents, tsToDate, CAMS, formatEventInfo, CATEGORIES, E
 import { init as initInsights } from './insights.js';
 import { parseClip, probeSei } from './mp4.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
+import { updateTopbar } from './topbar.js';
 import { initExport } from './export.js';
 import { init as initBlur } from './blur.js';
 import { createMap } from './map.js';
 import { createGraph } from './graph.js';
 import { t } from './i18n.js';
+import { renderLegend } from './legend.js';
 import { seg } from './seg.js';
 import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
@@ -21,6 +23,7 @@ const NAMES = { front: 'Front', back: 'Back', left_repeater: 'Left', right_repea
 
 const busy = mountBusy();
 const map = createMap($('map'));
+renderLegend($('legend')); document.addEventListener('langchange', () => renderLegend($('legend')));
 const graph = createGraph($('graph'), { seek: (t) => ev && seekGlobal(t) });
 $('tiles').onchange = (e) => map.setTiles(e.target.checked);
 let events = [], ev = null, focusCam = 'front';
@@ -55,7 +58,7 @@ const visibleEvents = () => filterEvents(events, filter);
 
 function renderFilters() {
   const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
-  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), saved: t('Saved by you') };
+  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), handle: t('Door handle pulled while locked'), saved: t('Saved by you') };
   const box = $('cats'); box.innerHTML = '';
   const byCat = countBy(events, (e) => e.category);
   const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
@@ -198,7 +201,7 @@ async function openEvent(e) {
   focusCam = cams.includes('front') ? 'front' : cams[0];
   buildGrid();
   $('empty').hidden = true;
-  $('hud').hidden = !samples.length;
+  hudEl.hidden = !samples.length;
   drawGraph(); drawMap(0);
   insightsRefresh.forEach((f) => f());
   $('status').textContent = hevc && !samples.length ? 'HEVC clip: video plays if your browser supports it; no telemetry found'
@@ -249,6 +252,7 @@ function probeDuration(blob) {
 }
 
 function buildGrid() {
+  $('stage').append(hudEl); // rescue HUD from tiles about to be removed
   const g = $('grid'); g.innerHTML = ''; for (const k in vids) delete vids[k];
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
@@ -305,6 +309,7 @@ async function loadSeg(i, at) {
     v.src = URL.createObjectURL(resolve(f));
   })));
   } finally { task.end(); }
+  updateUi();
   if (wantPlay) playAll();
 }
 
@@ -383,6 +388,16 @@ function sampleAt(t) {
   return a[lo];
 }
 
+// HUD lives inside the front tile (first cam as fallback; stage bottom when focus is on another cam).
+const hudEl = $('hud');
+function placeHud() {
+  const g = $('grid'), cams = [...g.children], focus = g.classList.contains('focus');
+  const host = dash() ? $('stage') : (focus ? cams.find((d) => d._cam === focusCam && d._cam === 'front') : cams.find((d) => d._cam === 'front') ?? cams[0]) ?? $('stage');
+  if (hudEl.parentNode !== host) host.append(hudEl);
+}
+try { hudEl.classList.toggle('off', localStorage.showHud === '0'); $('showHud').checked = localStorage.showHud !== '0'; } catch {}
+$('showHud').onchange = (e) => { hudEl.classList.toggle('off', !e.target.checked); try { localStorage.showHud = e.target.checked ? '1' : '0'; } catch {} };
+
 function updateUi() {
   const t = globalTime();
   $('seek').value = ev.total ? (t / ev.total) * 1000 : 0;
@@ -396,14 +411,16 @@ function updateUi() {
     const html =
       `<div class="h-speed"><b>${Math.round(u === 'kmh' ? kmh : mph)}</b><small>${u === 'kmh' ? 'km/h' : 'mph'}</small></div>` +
       `<div class="h-gear" title="Gear">${['P', 'R', 'N', 'D'].map((g) => `<i class="${GEAR[m.gear] === g ? 'on' : ''}">${g}</i>`).join('')}</div>` +
-      `<div class="h-wheel"><svg viewBox="0 0 48 48" style="transform:rotate(${m.steering}deg)"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M4.5 22h13.5M30 22h13.5M24 28v16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg><b>${m.steering.toFixed(0)}°</b></div>` +
+      `<div class="h-wheel ap${m.autopilot}"><svg viewBox="0 0 48 48" style="transform:rotate(${m.steering}deg)"><circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M4.5 22h13.5M30 22h13.5M24 28v16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/></svg><b>${m.steering.toFixed(0)}°</b></div>` +
       `<div class="h-pedals"><div class="h-bar"><i style="--v:${Math.round(m.accel * 100)}%"></i><span class="k">Thr</span></div>` +
       `<div class="h-bar brake"><i style="--v:${m.brake ? 100 : 0}%"></i><span class="k">Brk</span></div></div>` +
       `<div class="h-turn">${arrow(0, m.blinkerLeft)}${arrow(1, m.blinkerRight)}</div>` +
-      (m.autopilot ? `<div class="h-ap">${AUTOPILOT[m.autopilot]}</div>` : '') +
+      `<div class="h-ap ap${m.autopilot}">${AUTOPILOT[m.autopilot] ?? ''}</div>` +
       `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
     if (html !== lastHud) { lastHud = html; $('hud').innerHTML = html; }
   }
+  updateTopbar(ev, segIdx, t, m, $('units').value);
+  placeHud();
   drawGraph(t); drawMap(t);
 }
 

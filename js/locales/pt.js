@@ -83,6 +83,7 @@ export default {
   "Honk": "Buzina",
   "Emergency braking": "Frenagem de emergência",
   "Collision": "Colisão",
+  "Door handle pulled while locked": "Maçaneta puxada com o carro trancado",
   "No events match this filter.": "Nenhum evento corresponde a este filtro.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria disponível",
@@ -101,6 +102,7 @@ export default {
   "Export video": "Exportar vídeo",
   "Download CSV": "Baixar CSV",
   "Burn in HUD": "Incorporar HUD",
+  "Show HUD": "Mostrar HUD",
   "Export enlarged cam only": "Exportar só a câmera ampliada",
   "Edit blur": "Editar desfoque",
 };

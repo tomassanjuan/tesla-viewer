@@ -59,11 +59,12 @@
     <p id="cryptMsg" class="note"></p>
   </details>
   <div id="extras-side"></div>
-  <a id="ver" class="ver" href="https://github.com/tomassanjuan/tesla-viewer" target="_blank" rel="noopener" title="View source on GitHub">dev</a>
 </aside>
+<div id="sideResize" role="separator" aria-orientation="vertical" aria-label="Resize library sidebar" aria-valuemin="220" aria-valuemax="560" tabindex="0" title="Drag to resize, double-click to reset"></div>
 
 <main>
-  <div id="mbar"><button id="menuBtn" class="ibtn" type="button" aria-label="Open library" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-panel"/></svg></button><b>Tesla Viewer</b></div>
+  <div id="mbar"><button id="menuBtn" class="ibtn" type="button" aria-label="Open library" aria-controls="side" aria-expanded="false"><svg class="ic"><use href="#i-panel"/></svg></button><b>Tesla Viewer</b><a id="ver" class="ver" href="https://github.com/tomassanjuan/tesla-viewer" target="_blank" rel="noopener" title="View source on GitHub">dev</a></div>
+  <div id="topbar"></div>
   <div id="stage">
     <div id="grid"></div>
     <div id="empty">
@@ -97,6 +98,7 @@
         <div class="sel" title="Playback speed"><span>Speed</span><div id="speed" class="seg" aria-label="Playback speed"><button type="button" data-v="0.1">0.1x</button><button type="button" data-v="0.25">0.25x</button><button type="button" data-v="0.5">0.5x</button><button type="button" data-v="1" class="on">1x</button><button type="button" data-v="2">2x</button><button type="button" data-v="4">4x</button><button type="button" data-v="10">10x</button></div></div>
         <div class="sel"><span>View</span><div id="layout" class="seg" aria-label="Layout"><button type="button" data-v="auto" class="on">Grid</button><button type="button" data-v="focus">Focus</button><button type="button" data-v="dash" title="Telemetry only, no cameras">Dashboard</button></div></div>
         <div class="sel"><span>Units</span><div id="units" class="seg" aria-label="Speed units"><button type="button" data-v="kmh" class="on">km/h</button><button type="button" data-v="mph">mph</button></div></div>
+        <div class="sel"><span>Load</span><div class="seg" role="group" aria-label="Playback load"><button id="lowLoad" type="button" aria-pressed="false" title="Play only the focused camera to reduce load">Focus cam only</button><button id="perfBtn" type="button" aria-pressed="false" title="Show dropped frames and decoder info">Show stats</button></div></div>
       </div>
       <div class="grp" id="gapgrp" hidden role="group" aria-label="Gaps between clips">
         <button id="gapSkip" class="btn" type="button" aria-pressed="true" title="Jump over gaps between clips">Skip gaps</button>
@@ -107,6 +109,7 @@
         <button id="setOut" class="btn" type="button" title="Set trim end"><svg class="ic"><use href="#i-out"/></svg>Set end</button>
         <button id="export" class="btn primary" type="button"><svg class="ic"><use href="#i-export"/></svg>Export video</button>
         <label class="chip"><input type="checkbox" id="expHud" checked>Burn in HUD</label>
+        <label class="chip"><input type="checkbox" id="showHud" checked>Show HUD</label>
         <label class="chip" title="Exports only the camera you enlarged by clicking it"><input type="checkbox" id="expFocus">Export enlarged cam only</label>
         <small id="trimInfo" class="note"></small>
       </div>
@@ -125,6 +128,7 @@
       <label id="mapopt" title="Off by default. When on, your browser requests tiles from tile.openstreetmap.org, which reveals the map area (GPS coordinates) and your IP to that server."><input type="checkbox" id="tiles"> Show map tiles (loads OpenStreetMap tiles, sends coordinates to tile server)</label></section>
     <div id="extras-panels"></div>
   </div>
+  <div id="legend" class="legend" role="group" aria-label="Legend"></div>
 </main>
 <div id="scrim"></div>
 </div>
