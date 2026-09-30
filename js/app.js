@@ -12,12 +12,13 @@ import { createGraph } from './graph.js';
 import { t } from './i18n.js';
 import { renderLegend, SIGNALS } from './legend.js';
 import { seg } from './seg.js';
-import { spatialLayout } from './layout.js';
+import { spatialLayout, fitStage, DEFAULT_AR } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
 import { mountBusy } from './progress.js';
 import { waitLoaded } from './videoload.js';
 import { due, pickDriftFix, shouldPlay, initPerf } from './perf.js';
+import { newHealth, stepHealth, pickMaster } from './camhealth.js';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = (id) => document.getElementById(id);
@@ -365,15 +366,16 @@ function probeDuration(blob) {
 
 function buildGrid() {
   $('stage').append(hudEl); // rescue HUD from tiles about to be removed
-  const g = $('grid'); g.innerHTML = ''; for (const k in vids) delete vids[k];
+  const g = $('grid'); g.innerHTML = ''; for (const k in vids) delete vids[k]; for (const k in health) delete health[k];
   for (const c of ev.cams) {
     const d = document.createElement('div'); d.className = 'cam';
-    d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span>`;
+    d.innerHTML = `<video muted playsinline preload="auto"></video><span>${NAMES[c]}</span><i class="cam-state" role="status"></i>`;
     d.tabIndex = 0; d.title = d.ariaLabel = `${NAMES[c]}: ${t('Click to enlarge')}`;
     d.onclick = () => toggleFocus(c);
     d.onkeydown = (k) => { if (k.key === 'Enter') toggleFocus(c); };
     d.ondblclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else d.requestFullscreen?.().catch(() => {}); };
     vids[c] = d.querySelector('video'); d._cam = c; g.append(d);
+    vids[c].addEventListener('loadedmetadata', fit);
   }
   applyLayout();
 }
@@ -391,27 +393,54 @@ function toggleFocus(c) {
 function applyLayout() {
   const g = $('grid'), focus = $('layout').value === 'focus';
   g.classList.toggle('focus', focus); $('app').classList.toggle('dash', dash());
-  if (focus) { g.style.gridTemplateColumns = '1fr'; g.style.gridTemplateRows = '1fr'; }
-  else buildGridTemplate();
-  for (const d of g.children) { const p = focus ? null : layout.place[d._cam]; d.style.gridColumn = p ? p.col : ''; d.style.gridRow = p ? p.row : ''; }
+  layout = spatialLayout(ev.cams);
   for (const d of g.children) d.classList.toggle('main', d._cam === focusCam);
+  fit();
 }
 let layout = { place: {} };
-function buildGridTemplate() {
-  layout = spatialLayout(ev.cams); const g = $('grid');
-  g.style.gridTemplateColumns = `repeat(${layout.cols},1fr)`;
-  g.style.gridTemplateRows = `repeat(${layout.rows},1fr)`;
+
+// Size every tile to its video's real aspect ratio so no black bars are left inside tiles (video is never cropped).
+const arOf = (v) => (v?.videoWidth > 0 && v.videoHeight > 0 ? v.videoWidth / v.videoHeight : DEFAULT_AR);
+function fit() {
+  const g = $('grid'), st = $('stage'); if (!ev || !g.children.length || dash()) return;
+  const focus = g.classList.contains('focus'), phone = PHONE?.matches, root = document.documentElement.style;
+  const tiles = [...g.children], vis = focus ? tiles.filter((d) => d.classList.contains('main')) : tiles;
+  for (const d of tiles) d.style.aspectRatio = arOf(vids[d._cam]);
+  const mainAr = arOf(vids[focusCam] ?? Object.values(vids)[0]);
+  const geo = (d, r) => { const s = d.style; s.position = r ? 'absolute' : ''; s.right = r ? 'auto' : ''; s.left = r ? `${r.x}px` : ''; s.top = r ? `${r.y}px` : ''; s.width = r ? `${r.w}px` : ''; s.height = r ? `${r.h}px` : ''; };
+  if (phone) {
+    // portrait: stage height follows the main video's aspect; strip thumbnails keep their own aspect (see style.css)
+    const strip = !focus && tiles.length > 1 ? 82 : 0; root.setProperty('--ar', mainAr); root.setProperty('--strip-h', `${strip}px`);
+    for (const d of tiles) geo(d, null);
+    const main = tiles.find((d) => d.classList.contains('main')) ?? tiles[0]; if (!main) return;
+    const W = st.clientWidth, H = st.clientHeight - (focus ? 0 : g.offsetHeight);
+    const b = fitStage({ W, H, cams: [{ id: main._cam, ar: mainAr }], pad: 0 }).rects[main._cam];
+    if (b) geo(main, b);
+    return;
+  }
+  root.removeProperty('--ar'); root.removeProperty('--strip-h');
+  const cams = vis.map((d) => ({ id: d._cam, ar: arOf(vids[d._cam]) }));
+  const r = fitStage({ W: st.clientWidth, H: st.clientHeight, cams, place: focus ? null : layout.place, hero: focusCam });
+  for (const d of tiles) geo(d, r.rects[d._cam]);
+  g.dataset.fit = r.mode;
 }
+new ResizeObserver(() => fit()).observe($('stage'));
+addEventListener('resize', () => fit());
 
 const dash = () => $('layout').value === 'dash'; // telemetry-only view: videos stay paused, a virtual clock drives the timeline
 let dashT = 0, dashLast = 0;
 const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
-const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
+const health = {};        // cam -> camhealth.js record, reset every segment
+const states = () => Object.fromEntries(Object.entries(health).map(([c, h]) => [c, h.state]));
+// The clock everyone follows. A stalled/errored camera must not be the master: followers would be re-seeked back to its frozen time forever.
+const masterCam = () => (solo() && vids[focusCam]?.src ? focusCam : pickMaster(ev.cams, states(), (c) => vids[c]?.src) ?? Object.keys(vids)[0]);
+const master = () => vids[masterCam()];
 
+const LOAD_MS = +new URLSearchParams(location.search).get('loadms') || 8000;   // per-cam load timeout; ?loadms= lets tests shorten it
 let loadCtl;   // aborts the previous loadSeg when a newer one starts (seek/scrub/auto-advance/new clip), so its busy task always ends
 async function loadSeg(i, at) {
   loadCtl?.abort(); const ctl = loadCtl = new AbortController();
-  segIdx = i;
+  segIdx = i; for (const k in health) delete health[k];
   const s = ev.segs[i], task = busy.begin('Loading video'), failed = [];
   $('vidwarn').textContent = '';
   try {
@@ -420,9 +449,9 @@ async function loadSeg(i, at) {
       if (v.src) URL.revokeObjectURL(v.src);
       if (!f || (encrypted.has(f) && !decrypted.has(f))) { v.removeAttribute('src'); v.load(); return; }
       v.src = URL.createObjectURL(resolve(f));
-      const r = await waitLoaded(v, { signal: ctl.signal });
+      const r = await waitLoaded(v, { signal: ctl.signal, ms: LOAD_MS });
       if (r === 'ok') { v.currentTime = at; v.playbackRate = +$('speed').value; }
-      else if (r !== 'aborted') failed.push(`${NAMES[c]} (${r})`);
+      else if (r !== 'aborted') { failed.push(`${NAMES[c]} (${r})`); health[c] = { ...newHealth(), error: true, state: 'error' }; }
     }));
   } finally { task.end(); }
   if (ctl.signal.aborted) return;   // superseded: the newer call finishes the job
@@ -437,7 +466,24 @@ const UI_HZ = 12, DRIFT_MS = 500;
 function resync(at = master()?.currentTime) { if (at != null) for (const v of Object.values(vids)) if (v.src && Math.abs(v.currentTime - at) > 0.05) v.currentTime = at; syncPlayState(); }
 const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (!dash() && playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
 function playAll() { playing = true; dashLast = performance.now(); $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
-function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
+function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); for (const h of Object.values(health)) if (!h.error) h.state = 'paused'; paintStates(); }
+
+// Per-camera health: classify each tile, recover a stalled one once (re-seek to the master + play), then flag it as error.
+const HEALTH_MS = 250; let lastHealth = 0;
+const BADGE = { stalled: 'Stalled, retrying', error: 'Playback error' };
+function paintStates() { for (const d of $('grid').children) { const st = health[d._cam]?.state ?? 'paused'; d.dataset.state = st; d.querySelector('.cam-state').textContent = BADGE[st] ?? ''; } }
+function watchHealth(now) {
+  for (const [c, v] of Object.entries(vids)) {
+    if (!v.src) continue;
+    const h = health[c] ??= newHealth();
+    stepHealth(h, { time: v.currentTime, paused: v.paused, ended: v.ended, seeking: v.seeking, readyState: v.readyState, error: !!v.error, duration: v.duration }, now, playing && !dash() && shouldPlay(c, focusCam, solo()));
+    if (h.action === 'recover') {
+      const m = master(); if (m && m !== v) v.currentTime = m.currentTime;
+      v.play().catch(() => {});
+    }
+  }
+  paintStates();
+}
 function stop() { wantPlay = false; loadCtl?.abort(); if (ev) pauseAll(); }
 
 // the master must keep playing, so in low-load mode it is the focused camera
@@ -462,9 +508,11 @@ async function tick() {
     return;
   }
   const m = master(), s = ev.segs[segIdx];
-  if (!solo() && now - lastDrift > DRIFT_MS) {
+  if (now - lastHealth > HEALTH_MS) { lastHealth = now; watchHealth(now); }
+  // follow the master only while it is really advancing, and only re-seek followers that are healthy (recovery handles the rest)
+  if (!solo() && now - lastDrift > DRIFT_MS && health[masterCam()]?.state === 'playing') {
     lastDrift = now;
-    const fix = pickDriftFix(Object.entries(vids).filter(([, v]) => v !== m && v.src).map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
+    const fix = pickDriftFix(Object.entries(vids).filter(([c, v]) => v !== m && v.src && health[c]?.state === 'playing').map(([id, v]) => ({ id, time: v.currentTime, paused: v.paused, seeking: v.seeking })), m.currentTime);
     if (fix) vids[fix].currentTime = m.currentTime;
   }
   if (m.ended || m.currentTime >= s.dur - 0.03) {
@@ -608,4 +656,4 @@ initInsights({ getEvent: () => ev, seek: (t) => ev && seekGlobal(t), onUpdate: (
 initBlur(() => ({ get ev() { return ev; }, vids, get focusCam() { return focusCam; }, globalTime }));
 initExport({ busy, get ev() { return ev; }, vids, get focusCam() { return focusCam; }, seekGlobal, globalTime, sampleAt,
   units: () => $('units').value, play: () => { wantPlay = true; playAll(); }, pause: () => { wantPlay = false; pauseAll(); }, playing: () => playing });
-initPerf({ vids, codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) resync(); } });
+initPerf({ vids, state: (c) => health[c]?.state ?? 'paused', codec: () => ev?.codec, setLowLoad: (on) => { lowLoad = on; if (ev) resync(); } });

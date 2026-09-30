@@ -50,6 +50,7 @@ test('opening a folder lists trips and events and shows the first one', async ({
 });
 
 test('camera grid: 6 cameras in a 3x2 spatial layout, 4 in a 3x2 without pillars', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1100 }); // tall enough that the car-shaped grid is the best fit (short stages switch to a big-front arrangement)
   await load(page);
   await open(page, '2026-03-02_10-00-00');
   await expect(page.locator('#grid .cam')).toHaveCount(6);
@@ -336,17 +337,15 @@ test('collapsed sidebar persists across reload with a saved width', async ({ pag
   expect(await page.locator('main').evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThan(1270);
 });
 
-test('loading overlay never sticks: overlapping segment loads and a failing cam all end the task', async ({ page }) => {
+test('loading overlay never sticks: overlapping segment loads all end the task', async ({ page }) => {
   await load(page);
   await open(page, 'Trip');
-  // two segment loads back to back: the first is superseded before its metadata/error event fires
+  // segment loads back to back: each is superseded before its metadata/error event fires
   await page.evaluate(() => {
     const seek = document.getElementById('seek');
     for (const v of [800, 100, 800, 100]) { seek.value = v; seek.dispatchEvent(new Event('input', { bubbles: true })); }
   });
   await expect(page.locator('#busy')).toBeHidden({ timeout: 12000 });
-  // fixtures are not decodable, so every cam errors: the failure is named, non-blocking, and the app stays usable
-  await expect(page.locator('#vidwarn')).toContainText(/Could not load: .*Front/);
   await expect(page.locator('#play')).toBeEnabled();
 });
 
@@ -361,4 +360,126 @@ test('an emergency-braking clip always shows its event.json cue at the trigger t
     // 2 clips of 60 s, the cue sits 75/120 of the way along the bar
     expect(parseFloat(await cue.evaluate((e) => e.style.left))).toBeCloseTo((75 / 120) * 100, 0);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('a cam that never loads times out, is named, and the overlay still ends', async ({ page }) => {
+  // Whether the fixtures' fake H.264 loads or errors depends on the browser build, so force the failure instead of
+  // relying on it: the Back tile's src is ignored (metadata never arrives) and the per-cam timeout is shortened.
+  await page.addInitScript(() => {
+    const d = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src');
+    Object.defineProperty(HTMLMediaElement.prototype, 'src', { ...d, set(v) { if (this.parentElement?.textContent.trim() === 'Back') return; d.set.call(this, v); } });
+  });
+  await page.goto('/index.html?loadms=600');
+  await load(page);
+  await open(page, 'Trip');
+  await expect(page.locator('#vidwarn')).toContainText('Back (timeout)');
+  await expect(page.locator('#busy')).toBeHidden();
+  await expect(page.locator('#play')).toBeEnabled();
+});
+
+// ---------- video fills its tile: no crop, no black bars ----------
+// Reads every visible tile, its <video>, and the stage; video must equal the tile, sit inside the stage and keep its aspect.
+const geometry = (page) => page.evaluate(() => {
+  const st = document.getElementById('stage').getBoundingClientRect();
+  const tiles = [...document.querySelectorAll('#grid .cam')].filter((d) => getComputedStyle(d).display !== 'none').map((d) => {
+    const r = d.getBoundingClientRect(), v = d.querySelector('video').getBoundingClientRect();
+    return { cam: d._cam, r: { x: r.x, y: r.y, w: r.width, h: r.height }, v: { x: v.x, y: v.y, w: v.width, h: v.height }, fit: getComputedStyle(d.querySelector('video')).objectFit };
+  });
+  return { st: { x: st.x, y: st.y, w: st.width, h: st.height }, tiles };
+});
+const covered = (g) => g.tiles.reduce((s, t) => s + t.v.w * t.v.h, 0) / (g.st.w * g.st.h);
+const assertUncropped = (g, ar = 4 / 3) => {
+  for (const t of g.tiles) {
+    expect(t.fit, `${t.cam} object-fit`).toBe('contain');
+    for (const k of ['x', 'y', 'w', 'h']) expect(Math.abs(t.v[k] - t.r[k]), `${t.cam} video ${k} equals tile`).toBeLessThan(1.5);
+    expect(Math.abs(t.r.w / t.r.h - ar) / ar, `${t.cam} tile keeps the video aspect`).toBeLessThan(0.01);
+    expect(t.r.x).toBeGreaterThanOrEqual(g.st.x - 1); expect(t.r.y).toBeGreaterThanOrEqual(g.st.y - 1);
+    expect(t.r.x + t.r.w).toBeLessThanOrEqual(g.st.x + g.st.w + 1); expect(t.r.y + t.r.h).toBeLessThanOrEqual(g.st.y + g.st.h + 1);
+  }
+};
+// what an equal-cell 3x2 grid (the old layout) would cover for 4:3 video
+const oldCovered = (g) => { const cw = (g.st.w - 9) / 3, ch = (g.st.h - 6) / 2, s = Math.min(cw / (4 / 3), ch); return (6 * s * s * (4 / 3)) / (g.st.w * g.st.h); };
+
+for (const [W, H] of [[1920, 1080], [1440, 900]]) {
+  test(`desktop ${W}x${H}: videos are uncropped, fill their tiles and cover no less than the equal-cell grid`, async ({ page }) => {
+    await page.setViewportSize({ width: W, height: H });
+    await load(page); await open(page, '2026-03-02_10-00-00');
+    await expect(page.locator('#grid .cam')).toHaveCount(6);
+    let g = await geometry(page);
+    assertUncropped(g); expect(covered(g)).toBeGreaterThanOrEqual(oldCovered(g) - 0.005);
+    // focus view: one tile, still uncropped, bigger than any grid tile
+    await page.locator('#grid .cam', { hasText: 'Back' }).click();
+    const f = await geometry(page);
+    expect(f.tiles).toHaveLength(1); assertUncropped(f);
+    const back = g.tiles.find((t) => t.cam === 'back');
+    expect(f.tiles[0].r.w * f.tiles[0].r.h).toBeGreaterThan(back.r.w * back.r.h * 1.5);
+    await page.locator('#grid .cam.main').click();
+    // collapsing the sidebar re-fits the tiles to the wider stage
+    const before = (await geometry(page)).st.w;
+    await page.locator('#sideToggle').click();
+    await expect.poll(async () => (await geometry(page)).st.w).toBeGreaterThan(before + 200);
+    g = await geometry(page); assertUncropped(g);
+    expect(covered(g)).toBeGreaterThan(0.3);
+  });
+}
+
+test('video with a different real aspect (16:9) is fitted to its own dimensions', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { get: () => 1280 });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { get: () => 720 });
+  });
+  await page.goto('/index.html');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await load(page); await open(page, '2026-03-02_10-00-00');
+  await page.locator('#grid .cam').first().evaluate((d) => d.querySelector('video').dispatchEvent(new Event('loadedmetadata')));
+  assertUncropped(await geometry(page), 16 / 9);
+});
+
+test('mixed aspects: each tile uses its own video dimensions', async ({ page }) => {
+  await page.addInitScript(() => {
+    const wide = (v) => v.closest?.('.cam')?._cam === 'back';
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', { get() { return wide(this) ? 1200 : 1280; } });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', { get() { return wide(this) ? 1000 : 960; } });
+  });
+  await page.goto('/index.html');
+  await load(page); await open(page, '2026-03-02_10-00-00');
+  await page.locator('#grid .cam').first().evaluate((d) => d.querySelector('video').dispatchEvent(new Event('loadedmetadata')));
+  const g = await geometry(page);
+  for (const t of g.tiles) { const ar = t.cam === 'back' ? 1.2 : 4 / 3; expect(Math.abs(t.r.w / t.r.h - ar) / ar).toBeLessThan(0.01); expect(Math.abs(t.v.w - t.r.w)).toBeLessThan(1.5); }
+});
+
+const openOnPhone = async (page) => {
+  await page.locator('#pickDir').setInputFiles(folder);
+  await page.locator('#menuBtn').click();
+  await evt(page, '2026-03-02_10-00-00').click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#grid .cam')).toHaveCount(6);
+};
+
+test('phone portrait 390x844: main camera fills its area, thumbnails keep aspect, focus and tap-to-swap stay uncropped', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openOnPhone(page);
+  await expect(page.locator('#grid .cam')).toHaveCount(6);
+  const g = await geometry(page);
+  const main = g.tiles.find((t) => t.cam === 'front');
+  expect(Math.abs(main.r.w - 390)).toBeLessThan(2);            // full width: no pillarbox
+  expect(Math.abs(main.r.w / main.r.h - 4 / 3)).toBeLessThan(0.02);
+  for (const t of g.tiles) { expect(t.fit).toBe('contain'); expect(Math.abs(t.r.w / t.r.h - 4 / 3)).toBeLessThan(0.03); expect(Math.abs(t.v.w - t.r.w)).toBeLessThan(2.5); }
+  await page.locator('#grid .cam', { hasText: 'Back' }).click();
+  const swapped = await geometry(page);
+  expect(swapped.tiles.find((t) => t.cam === 'back').r.w).toBeGreaterThan(380);
+  await setOpt(page, '#layout', 'focus');
+  const f = await geometry(page);
+  expect(f.tiles).toHaveLength(1);
+  expect(Math.abs(f.tiles[0].r.w - 390)).toBeLessThan(2);
+});
+
+test('phone landscape 844x390: main camera is fitted with no side bars', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await openOnPhone(page);
+  const g = await geometry(page);
+  const main = g.tiles.find((t) => t.cam === 'front');
+  expect(Math.abs(main.r.w / main.r.h - 4 / 3)).toBeLessThan(0.02);
+  expect(Math.abs(main.v.w - main.r.w)).toBeLessThan(1.5);
+  expect(main.r.x + main.r.w).toBeLessThanOrEqual(g.st.x + g.st.w + 1);
 });
