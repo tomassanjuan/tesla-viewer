@@ -309,6 +309,7 @@ async function loadSeg(i, at) {
     v.src = URL.createObjectURL(resolve(f));
   })));
   } finally { task.end(); }
+  updateUi();
   if (wantPlay) playAll();
 }
 
