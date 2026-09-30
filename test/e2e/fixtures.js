@@ -13,8 +13,8 @@ const box = (type, ...kids) => {
   return Buffer.concat([h, body]);
 };
 
-function seiNal({ speed, lat, lon, seq, accel = 0.3 }) {
-  const payload = [0x08, 2, 0x10, 1, 0x18, ...varint(seq), 0x25, ...f32(speed), 0x2d, ...f32(accel), 0x35, ...f32(seq % 20), 0x59, ...f64(lat), 0x61, ...f64(lon)];
+function seiNal({ speed, lat, lon, seq, accel = 0.3, ax = 0, ay = 0 }) {
+  const payload = [0x08, 2, 0x10, 1, 0x18, ...varint(seq), 0x25, ...f32(speed), 0x2d, ...f32(accel), 0x35, ...f32(seq % 20), 0x59, ...f64(lat), 0x61, ...f64(lon), 0x71, ...f64(ax), 0x79, ...f64(ay)];
   const esc = []; let z = 0;
   for (const b of payload) { if (z >= 2 && b <= 3) { esc.push(3); z = 0; } esc.push(b); z = b === 0 ? z + 1 : 0; }
   return Uint8Array.from([0x06, 0x05, 0xff, 0x42, 0x42, 0x69, ...esc, 0x80]);
@@ -22,13 +22,13 @@ function seiNal({ speed, lat, lon, seq, accel = 0.3 }) {
 
 /**
  * opts: sei (default true), frames (30), fps (30), speed0 (m/s at first frame, ramps +0.5/frame), lat/lon,
- *       moovPad (bytes of junk inside moov, to force a big moov before mdat),
+ *       ay(frame) (lateral m/s2, default 0), moovPad (bytes of junk inside moov, to force a big moov before mdat),
  *       seiFrom (first frame that carries SEI), idrPad (bytes of slice data in the first frame: a real IDR is 100+ KB).
  */
-export function makeClip({ sei = true, frames = 30, fps = 30, speed0 = 5, lat = 40.4, lon = -3.7, moovPad = 0, seiFrom = 0, idrPad = 0 } = {}) {
+export function makeClip({ sei = true, frames = 30, fps = 30, speed0 = 5, lat = 40.4, lon = -3.7, moovPad = 0, ay = () => 0, seiFrom = 0, idrPad = 0 } = {}) {
   const nals = [];
   for (let i = 0; i < frames; i++) {
-    if (sei && i >= seiFrom) nals.push(seiNal({ speed: speed0 + i * 0.5, lat: lat + i * 1e-5, lon: lon + i * 1e-5, seq: i }));
+    if (sei && i >= seiFrom) nals.push(seiNal({ speed: speed0 + i * 0.5, lat: lat + i * 1e-5, lon: lon + i * 1e-5, seq: i, ay: ay(i) }));
     nals.push(i === 0 ? [0x65, 1, 2, 3, ...new Uint8Array(idrPad)] : [0x41, 9, 9]);
   }
   const mdatBody = Buffer.concat(nals.map((n) => Buffer.concat([u32(n.length), Buffer.from(n)])));
@@ -87,5 +87,18 @@ export function writeTelemetryEdges(root) {
   put(`SavedClips/${backOnly}/${backOnly}-front.mp4`, makeClip({ sei: false }));
   put(`SavedClips/${backOnly}/${backOnly}-back.mp4`, makeClip());
   put(`SavedClips/${backOnly}/event.json`, ev);
+  return cam;
+}
+
+/** A 3-clip trip (10 s each, front SEI) with one sharp-turn spike per clip, at known frames: peak times 5 s, 12 s, 28 s (global). */
+export const TURN_TRIP = { name: '2026-04-01_09-00-00', spikes: [5, 12, 28] };
+export function writeTurnTrip(root) {
+  const cam = join(root, 'TeslaCam');
+  for (let i = 0; i < 3; i++) {
+    const at = TURN_TRIP.spikes.map((t) => (t - i * 10) * 30).find((f) => f >= 0 && f < 300);
+    const ts = minute(TURN_TRIP.name, i);
+    const p = join(cam, `RecentClips/${ts}-front.mp4`); mkdirSync(dirname(p), { recursive: true });
+    writeFileSync(p, makeClip({ frames: 300, ay: (f) => (at !== undefined && f >= at && f < at + 10 ? 6 : 0) }));
+  }
   return cam;
 }

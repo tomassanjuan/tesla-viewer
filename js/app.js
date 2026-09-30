@@ -68,7 +68,7 @@ function renderFilters() {
   const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
   for (const [k, label, n] of tabs) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.category === k ? ' on' : '');
-    b.setAttribute('aria-pressed', filter.category === k); b.textContent = `${label} ${n}`;
+    b.setAttribute('aria-pressed', filter.category === k); b.append(`${label} `, Object.assign(document.createElement('span'), { className: 'n', textContent: n }));
     b.onclick = () => { filter.category = k; renderEvents(); };
     box.append(b);
   }
@@ -78,7 +78,7 @@ function renderFilters() {
   const keys = [...EVENT_TYPES, ...Object.keys(byType).filter((k) => k.startsWith(RAW_PREFIX)).sort()];
   for (const k of keys) if (byType[k]) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
-    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${typeLabel(k)} ${byType[k]}`;
+    b.setAttribute('aria-pressed', filter.type === k); b.append(`${typeLabel(k)} `, Object.assign(document.createElement('span'), { className: 'n', textContent: byType[k] }));
     b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
     tbox.append(b);
   }
@@ -106,7 +106,7 @@ function renderEvents() {
     if (e.thumb) {
       const u = URL.createObjectURL(e.thumb); thumbUrls.push(u);
       const im = Object.assign(document.createElement('img'), { src: u, alt: '', loading: 'lazy' });
-      im.style.cssText = 'display:block;grid-column:1/-1;width:100%;max-width:160px;border-radius:4px;margin-bottom:4px';
+      im.className = 'ev-thumb';
       d.prepend(im);
     }
     d.onclick = () => openEvent(e);

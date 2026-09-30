@@ -81,7 +81,7 @@ export function formatSummary(r, units = 'kmh') {
 // ---------- DOM hook (browser only) ----------
 const CSS = `.ins-panel{font-size:12px;padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px 12px}
 .ins-panel div{display:flex;justify-content:space-between;gap:6px}.ins-panel .k{opacity:.65}
-.ins-ticks{position:absolute;left:0;right:0;top:0;height:100%;pointer-events:none}
+.ins-ticks{position:absolute;left:calc(var(--th,0px) / 2);right:calc(var(--th,0px) / 2);top:0;height:100%;pointer-events:none}
 .ins-tick{position:absolute;top:0;width:6px;height:100%;margin-left:-3px;padding:0;border:0;border-radius:2px;cursor:pointer;pointer-events:auto;opacity:.85}
 ${Object.entries(TICKS).map(([k, v]) => `.ins-tick.${k}{background:${v.color}}`).join('')}
 .ins-tip{position:absolute;bottom:100%;transform:translateX(-50%);margin-bottom:4px;padding:2px 8px;border-radius:6px;background:#000c;color:#fff;font-size:12px;white-space:nowrap;pointer-events:none;z-index:5}`;
@@ -96,7 +96,7 @@ export function init(ctx) {
   if (getComputedStyle(par).position === 'static') par.style.position = 'relative';
   const ticks = Object.assign(document.createElement('div'), { className: 'ins-ticks' }); par.append(ticks);
   // tap/click shows the tooltip too (no hover on phones); it fades after a moment
-  const tip = Object.assign(document.createElement('div'), { className: 'ins-tip', hidden: true }); par.append(tip);
+  const tip = Object.assign(document.createElement('div'), { className: 'ins-tip', hidden: true }); ticks.append(tip);
   let tipTimer;
   function showTip(left, text) {
     tip.textContent = text; tip.style.left = left; tip.hidden = false;
@@ -104,7 +104,7 @@ export function init(ctx) {
   }
   function refresh() {
     const ev = ctx.getEvent?.();
-    panel.replaceChildren(); ticks.replaceChildren(); tip.hidden = true;
+    panel.replaceChildren(); ticks.replaceChildren(tip); tip.hidden = true;
     if (!ev?.samples?.length) { panel.hidden = true; return; }
     const r = analyze(ev.samples);
     panel.hidden = false;

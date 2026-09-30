@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeTeslaCam, writeTelemetryEdges } from './fixtures.js';
+import { writeTeslaCam, writeTelemetryEdges, writeTurnTrip, TURN_TRIP } from './fixtures.js';
 
 let root, folder;
 test.beforeAll(() => { root = mkdtempSync(join(tmpdir(), 'tv-e2e-')); folder = writeTeslaCam(root); });
@@ -227,4 +227,23 @@ test('CSV export downloads the telemetry', async ({ page }) => {
 test('keyboard shortcuts help toggles', async ({ page }) => {
   await page.locator('#helpBtn').click();
   await expect(page.locator('#help')).toBeVisible();
+});
+
+test('timeline ticks sit where the telemetry event happens (multi-clip trip)', async ({ page }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'tv-turn-'));
+  try {
+    await page.locator('#pickDir').setInputFiles(writeTurnTrip(dir));
+    await expect(page.locator('#events .ev').first()).toBeVisible();
+    await expect(page.locator('.ins-tick.turn')).toHaveCount(3);
+    const total = 30; // 3 clips x 10 s
+    // clip 2 and 3 offsets are added: peaks at 0:05, 0:12 and 0:28 of the whole trip
+    expect(await page.locator('.ins-tick.turn').evaluateAll((els) => els.map((e) => e.title.slice(-4)))).toEqual(['0:05', '0:12', '0:28']);
+    const xs = await page.locator('.ins-tick.turn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return r.x + r.width / 2; }));
+    // the range thumb's centre for value v travels the track minus one thumb width: that is where the playhead is drawn
+    for (const [i, t] of TURN_TRIP.spikes.entries()) {
+      await page.locator('#seek').evaluate((el, v) => { el.value = v; }, (t / total) * 1000);
+      const thumb = await page.locator('#seek').evaluate((el) => { const r = el.getBoundingClientRect(), tw = 16; /* desktop thumb width, style.css */ return r.x + tw / 2 + (r.width - tw) * (el.value / 1000); });
+      expect(Math.abs(xs[i] - thumb), `tick ${i} at ${t}s`).toBeLessThan(2);
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
