@@ -1,7 +1,9 @@
 // Trip insights: pure analysis over telemetry samples + a small DOM hook (init).
 import { TICKS } from './legend.js';
 import { t } from './i18n.js';
-export const DEFAULTS = { brakeMps2: 3, accelMps2: 2.5, turnMps2: 3.5, minGapS: 3, jitterMps: 60 };
+// brakeStrongMps2: decel that counts as braking even with the pedal at 0 (regen alone tops out lower). Tick thresholds are on the
+// smoothed (smoothS) value and must hold for minDurS; same-kind events closer than minGapS merge into one tick.
+export const DEFAULTS = { brakeMps2: 3, brakeStrongMps2: 5, accelMps2: 2.5, turnMps2: 2.5, minGapS: 5, minDurS: 0.3, smoothS: 0.5, jitterMps: 60 };
 const R = 6371000, rad = Math.PI / 180;
 
 export function haversine(a, b) {
@@ -10,18 +12,36 @@ export function haversine(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// Group consecutive above-threshold samples into one event (peak time); events closer than minGap merge.
-function detect(samples, val, thr, minGap) {
+// Moving average of f over +-w seconds (sensor noise and one-frame spikes must not make an event).
+function smooth(sm, f, w) {
   const out = [];
-  let cur = null;
-  for (const s of samples) {
-    const v = val(s);
-    if (v < thr) continue;
-    if (cur && s.t - cur.last <= minGap) { cur.last = s.t; if (v > cur.v) { cur.v = v; cur.t = s.t; } }
-    else { if (cur) out.push(cur); cur = { t: s.t, last: s.t, v }; }
+  for (let i = 0, lo = 0, hi = 0, sum = 0; i < sm.length; i++) {
+    for (; hi < sm.length && sm[hi].t <= sm[i].t + w; hi++) sum += f(sm[hi]);
+    for (; sm[lo].t < sm[i].t - w; lo++) sum -= f(sm[lo]);
+    out.push(sum / (hi - lo));
   }
-  if (cur) out.push(cur);
   return out;
+}
+
+// Events = runs of smoothed values >= thr that last >= minDur and pass `ok(run)`; runs closer than minGap merge (peak wins).
+function detect(sm, vals, thr, { minDur, minGap }, ok = () => true) {
+  const runs = [];
+  let cur = null;
+  const close = () => { if (cur && cur.last - cur.first >= minDur && ok(cur)) runs.push(cur); cur = null; };
+  sm.forEach((s, i) => {
+    if (vals[i] < thr) return close();
+    cur ??= { first: s.t, last: s.t, v: 0, t: s.t, s, flag: false };
+    cur.last = s.t;
+    if (vals[i] > cur.v) { cur.v = vals[i]; cur.t = s.t; cur.s = s; }
+    cur.flag ||= !!s.brake;
+  });
+  close();
+  return runs.reduce((out, r) => {
+    const p = out[out.length - 1];
+    if (p && r.first - p.last <= minGap) { p.last = r.last; p.flag ||= r.flag; if (r.v > p.v) Object.assign(p, { v: r.v, t: r.t, s: r.s }); }
+    else out.push(r);
+    return out;
+  }, []);
 }
 
 export function analyze(samples, opt = {}) {
@@ -54,18 +74,20 @@ export function analyze(samples, opt = {}) {
   res.avgSpeedMps = spdSum / sm.length;
   res.autopilotPct = res.duration > 0 ? (apTime / res.duration) * 100 : 0;
   // ax: longitudinal accel (m/s2), negative = braking; ay: lateral.
-  const add = (evs, kind, label) => { for (const e of evs) res.markers.push({ t: e.t, kind, label: `${label} ${e.v.toFixed(1)} m/s²` }); return evs.length; };
-  res.hardBraking = add(detect(sm, (s) => -(s.ax || 0), o.brakeMps2, o.minGapS), 'brake', 'Hard braking');
-  res.hardAccel = add(detect(sm, (s) => s.ax || 0, o.accelMps2, o.minGapS), 'accel', 'Hard acceleration');
-  res.sharpTurns = add(detect(sm, (s) => Math.abs(s.ay || 0), o.turnMps2, o.minGapS), 'turn', 'Sharp turn');
+  const d = { minDur: o.minDurS, minGap: o.minGapS };
+  const add = (evs, kind, label, note) => { for (const e of evs) res.markers.push({ t: e.t, kind, label: `${label} ${e.v.toFixed(1)} m/s²`, v: e.v, note: note(e) }); return evs.length; };
+  const sx = smooth(sm, (s) => s.ax || 0, o.smoothS), sy = smooth(sm, (s) => Math.abs(s.ay || 0), o.smoothS);
+  res.hardBraking = add(detect(sm, sx.map((v) => -v), o.brakeMps2, d, (r) => r.flag || r.v >= o.brakeStrongMps2), 'brake', 'Hard braking', (e) => (e.flag ? 'brake pedal' : 'no brake pedal'));
+  res.hardAccel = add(detect(sm, sx, o.accelMps2, d, (r) => r.s.accel > 0), 'accel', 'Hard acceleration', (e) => `throttle ${Math.round(Math.min(1, e.s.accel || 0) * 100)}%`);
+  res.sharpTurns = add(detect(sm, sy, o.turnMps2, d), 'turn', 'Sharp turn', (e) => `steering ${Math.round(e.s.steering || 0)}°`);
   res.markers.sort((a, b) => a.t - b.t);
   return res;
 }
 
-/** Tooltip text: "<category> · m:ss" plus the peak value where the marker has one. */
+/** Tooltip text: "<category> <peak> · <why> · m:ss"; the note says what backs the event (brake pedal, throttle, steering). */
 export function tickText(m) {
   const s = Math.max(0, Math.round(m.t));
-  return `${t(TICKS[m.kind]?.label ?? m.label)}${m.label.match(/ [\d.]+ m\/s²$/)?.[0] ?? ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${t(TICKS[m.kind]?.label ?? m.label)}${m.v ? ` ${m.v.toFixed(1)} m/s²` : ''}${m.note ? ` · ${t(m.note)}` : ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 export function formatSummary(r, units = 'kmh') {
