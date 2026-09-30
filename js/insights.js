@@ -1,5 +1,5 @@
 // Trip insights: pure analysis over telemetry samples + a small DOM hook (init).
-import { TICKS } from './legend.js';
+import { TICKS, SIGNALS } from './legend.js';
 import { t } from './i18n.js';
 export const DEFAULTS = { brakeMps2: 3, accelMps2: 2.5, turnMps2: 3.5, minGapS: 3, jitterMps: 60 };
 const R = 6371000, rad = Math.PI / 180;
@@ -24,10 +24,25 @@ function detect(samples, val, thr, minGap) {
   return out;
 }
 
+/** Turn-indicator spans per side: first to last "on" sample, runs closer than mergeGap (blinker flicker) merged. */
+export function signalSpans(samples, mergeGap = 1) {
+  const out = [];
+  for (const side of ['left', 'right']) {
+    const key = side === 'left' ? 'blinkerLeft' : 'blinkerRight';
+    let cur = null;
+    for (const s of samples) {
+      if (!s[key]) continue;
+      if (cur && s.t - cur.end <= mergeGap) cur.end = s.t; else { if (cur) out.push(cur); cur = { side, start: s.t, end: s.t }; }
+    }
+    if (cur) out.push(cur);
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
 export function analyze(samples, opt = {}) {
   const o = { ...DEFAULTS, ...opt };
   const sm = (samples ?? []).filter((s) => Number.isFinite(s?.t)).sort((a, b) => a.t - b.t);
-  const res = { duration: 0, distanceM: 0, maxSpeedMps: 0, avgSpeedMps: 0, autopilotPct: 0, hardBraking: 0, hardAccel: 0, sharpTurns: 0, apEngages: 0, apDisengages: 0, markers: [] };
+  const res = { duration: 0, distanceM: 0, maxSpeedMps: 0, avgSpeedMps: 0, autopilotPct: 0, hardBraking: 0, hardAccel: 0, sharpTurns: 0, apEngages: 0, apDisengages: 0, markers: [], signals: [] };
   if (!sm.length) return res;
   res.duration = sm[sm.length - 1].t - sm[0].t;
   let spdSum = 0, apTime = 0, last = null;
@@ -59,6 +74,7 @@ export function analyze(samples, opt = {}) {
   res.hardAccel = add(detect(sm, (s) => s.ax || 0, o.accelMps2, o.minGapS), 'accel', 'Hard acceleration');
   res.sharpTurns = add(detect(sm, (s) => Math.abs(s.ay || 0), o.turnMps2, o.minGapS), 'turn', 'Sharp turn');
   res.markers.sort((a, b) => a.t - b.t);
+  res.signals = signalSpans(sm);
   return res;
 }
 
@@ -67,6 +83,10 @@ export function tickText(m) {
   const s = Math.max(0, Math.round(m.t));
   return `${t(TICKS[m.kind]?.label ?? m.label)}${m.label.match(/ [\d.]+ m\/s²$/)?.[0] ?? ''} · ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
+
+const mss = (x) => { const s = Math.max(0, Math.round(x)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+/** Tooltip text for an indicator span: "Left indicator 0:23 to 0:31". */
+export const signalText = (g) => `${t(SIGNALS[g.side].label)} ${mss(g.start)} ${t('to')} ${mss(g.end)}`;
 
 export function formatSummary(r, units = 'kmh') {
   const mph = units === 'mph';
@@ -83,6 +103,8 @@ const CSS = `.ins-panel{font-size:12px;padding:8px;display:grid;grid-template-co
 .ins-panel div{display:flex;justify-content:space-between;gap:6px}.ins-panel .k{opacity:.65}
 .ins-ticks{position:absolute;left:calc(var(--th,0px) / 2);right:calc(var(--th,0px) / 2);top:0;height:100%;pointer-events:none}
 .ins-tick{position:absolute;top:0;width:6px;height:100%;margin-left:-3px;padding:0;border:0;border-radius:2px;cursor:pointer;pointer-events:auto;opacity:.85}
+.ins-sig{position:absolute;height:5px;min-width:6px;padding:0;border:0;border-radius:3px;cursor:pointer;pointer-events:auto;background:${SIGNALS.left.color};opacity:.9;z-index:3}
+.ins-sig.left{top:0}.ins-sig.right{bottom:0}
 ${Object.entries(TICKS).map(([k, v]) => `.ins-tick.${k}{background:${v.color}}`).join('')}
 .ins-tip{position:absolute;bottom:100%;transform:translateX(-50%);margin-bottom:4px;padding:2px 8px;border-radius:6px;background:#000c;color:#fff;font-size:12px;white-space:nowrap;pointer-events:none;z-index:5}`;
 
@@ -111,6 +133,13 @@ export function init(ctx) {
     for (const [k, v] of formatSummary(r, units?.value)) {
       const d = document.createElement('div'), a = document.createElement('span'), b = document.createElement('b');
       a.className = 'k'; a.textContent = k; b.textContent = v; d.append(a, b); panel.append(d);
+    }
+    for (const g of r.signals) {
+      const b = document.createElement('button'), text = signalText(g);
+      b.className = `ins-sig ${g.side}`; b.title = text; b.setAttribute('aria-label', text);
+      b.style.left = `${(g.start / ev.total) * 100}%`; b.style.width = `${((g.end - g.start) / ev.total) * 100}%`;
+      b.onclick = () => { ctx.seek(g.start); showTip(`${((g.start + g.end) / 2 / ev.total) * 100}%`, text); };
+      ticks.append(b);
     }
     for (const m of r.markers) {
       const b = document.createElement('button'), text = tickText(m);

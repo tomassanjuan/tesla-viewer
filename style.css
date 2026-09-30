@@ -7,7 +7,7 @@
   --bg:#0b0d11;--surface:#12151b;--surface-2:#1a1e26;--surface-3:#242a35;
   --border:#2a303c;--fg:#eceef2;--mut:#98a1b0;
   --accent:#e31937;--accent-hi:#ff3b57;--on-accent:#fff;
-  --info:#5aa9ff;--throttle:#22d3ee;--ok:#34d27b;--warn:#f5a524;
+  --info:#5aa9ff;--throttle:#22d3ee;--ok:#34d27b;--warn:#f5a524;--signal:#f472b6;
   --route-driven:#5aa9ff;--route-ahead:rgba(152,161,176,.6); /* map route: shared with legend (Driven / Ahead) */
   --stage:#000;--glass:rgba(14,17,23,.82);--glass-b:rgba(255,255,255,.14);--hud-fg:#fff;--hud-mut:rgba(255,255,255,.62);
   --shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-2:0 8px 28px rgba(0,0,0,.45);
@@ -152,8 +152,10 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .h-bar:not(.brake) b{color:var(--throttle)}
 .h-bar.brake b{color:var(--accent)}
 .h-turn{display:flex;gap:4px}
-.h-turn svg{width:24px;height:24px;color:rgba(255,255,255,.2)}
-.h-turn svg.on{color:var(--ok);filter:drop-shadow(0 0 6px var(--ok))}
+.h-turn svg{width:28px;height:28px;color:rgba(255,255,255,.22)}
+.h-turn svg.on{color:var(--signal,#f472b6);filter:drop-shadow(0 0 8px var(--signal,#f472b6));animation:h-blink 1s steps(1) infinite}
+@keyframes h-blink{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.h-turn svg.on{animation:none}}
 .h-ap{font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--info) 30%,transparent);border:1px solid var(--info);color:#cfe5ff;white-space:nowrap}
 .h-g{display:flex;flex-direction:column;align-items:center;gap:4px}
 .h-g i{position:relative;display:block;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2)}
@@ -405,6 +407,8 @@ canvas{background:transparent}
 .lg-band{opacity:.5;border-radius:2px}
 .lg-bar{width:6px;height:10px;border-radius:1px}
 .lg-hatch{background:repeating-linear-gradient(45deg,var(--c),var(--c) 2px,transparent 2px,transparent 4px);border-radius:2px}
+.lg-sig-left,.lg-sig-right{width:16px;height:12px;background:var(--c);clip-path:polygon(40% 0,0 50%,40% 100%,40% 75%,100% 75%,100% 25%,40% 25%)}
+.lg-sig-right{transform:scaleX(-1)}
 .lg-dot{width:10px;border-radius:50%;border:1.5px solid #fff}
 @media (max-width:860px){.legend{padding:var(--s2) var(--s4) var(--s5);gap:var(--s2) var(--s3)}.lg-group{width:100%}}
 

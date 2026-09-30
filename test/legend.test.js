@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { LEGEND, COLOR, TICKS } from '../js/legend.js';
+import { LEGEND, COLOR, TICKS, SIGNALS, SIGNAL_COLOR } from '../js/legend.js';
 
 const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 
@@ -14,7 +14,7 @@ test('legend covers graph, timeline and map with unique labels per group', () =>
 });
 
 test('every legend color is a COLOR token that the drawing code reads', () => {
-  const tokens = new Set([...Object.values(COLOR), ...Object.values(TICKS).map((k) => k.color)]);
+  const tokens = new Set([...Object.values(COLOR), ...Object.values(TICKS).map((k) => k.color), ...Object.values(SIGNALS).map((k) => k.color)]);
   for (const { items } of LEGEND) for (const i of items) assert.ok(tokens.has(i.color), i.label);
   const graph = read('js/graph.js'), map = read('js/map.js');
   for (const k of ['speed', 'ap', 'throttle', 'brake', 'playhead']) assert.ok(graph.includes(`COLOR.${k}`), `graph.js ignores COLOR.${k}`);
@@ -40,4 +40,12 @@ test('throttle has its own color token, distinct from speed/AP/brake, used by th
   assert.equal(css.match(/--throttle:/g).length, 3, 'defined in dark, light and auto-light themes');
   assert.ok(css.includes('background:var(--throttle)'), 'HUD throttle bar uses the token');
   assert.match(read('js/graph.js'), /THR_LANE/);
+});
+
+test('turn indicators: one definition feeds legend, HUD and lane, with a color distinct from the ticks', () => {
+  const tl = LEGEND.find((g) => g.id === 'timeline').items;
+  for (const [side, k] of Object.entries(SIGNALS)) assert.ok(tl.some((i) => i.kind === `sig-${side}` && i.label === k.label && i.color === k.color), side);
+  assert.ok(!Object.values(TICKS).some((k) => k.color === SIGNAL_COLOR));
+  assert.ok(read('js/app.js').includes('SIGNALS[side]'), 'HUD must draw from SIGNALS');
+  assert.ok(read('style.css').includes(`--signal:${SIGNAL_COLOR}`), 'css var matches SIGNAL_COLOR');
 });

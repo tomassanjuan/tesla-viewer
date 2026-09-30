@@ -255,7 +255,15 @@ test('timeline ticks sit where the telemetry event happens (multi-clip trip)', a
     await page.locator('#pickDir').setInputFiles(writeTurnTrip(dir));
     await expect(page.locator('#events .ev').first()).toBeVisible();
     await expect(page.locator('.ins-tick.turn')).toHaveCount(3);
+    // turn indicators: own lane, spans with the global time, click seeks to the start
+    await expect(page.locator('.ins-sig')).toHaveCount(2);
+    await expect(page.locator('.ins-sig.left')).toHaveAttribute('title', 'Left indicator 0:12 to 0:15');
+    await expect(page.locator('.ins-sig.right')).toHaveAttribute('title', 'Right indicator 0:21 to 0:23');
     const total = 30; // 3 clips x 10 s
+    const lane = await page.locator('.ins-sig').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, w: r.width, h: r.height }; }));
+    expect(lane.every((l) => l.h >= 4 && l.w >= 6)).toBe(true);
+    const seekBox = await page.locator('#seek').evaluate((el) => { const r = el.getBoundingClientRect(); return { x: r.x + 8, w: r.width - 16 }; }); // minus half a desktop thumb each side
+    expect(Math.abs(lane[0].x - (seekBox.x + seekBox.w * (12 / total)))).toBeLessThan(2);
     // clip 2 and 3 offsets are added: peaks at 0:05, 0:12 and 0:28 of the whole trip
     expect(await page.locator('.ins-tick.turn').evaluateAll((els) => els.map((e) => e.title.slice(-4)))).toEqual(['0:05', '0:12', '0:28']);
     const xs = await page.locator('.ins-tick.turn').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return r.x + r.width / 2; }));

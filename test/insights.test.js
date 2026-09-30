@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyze, formatSummary, haversine } from '../js/insights.js';
+import { analyze, formatSummary, haversine, signalSpans, signalText } from '../js/insights.js';
 import { groupFiles, formatEventInfo } from '../js/library.js';
 
 // steady 20 m/s drive due north for 60 s at 1 Hz (~1 deg lat = 111195 m)
@@ -80,4 +80,13 @@ test('tick tooltips and legend share one definition', async () => {
   assert.equal(tickText(r.markers.find((m) => m.kind === 'ap-on')), 'Autopilot engaged · 0:30');
   const legend = LEGEND.find((g) => g.id === 'timeline').items.map((i) => `${i.label}:${i.color}`);
   for (const k of Object.values(TICKS)) assert.ok(legend.includes(`${k.label}:${k.color}`), k.label);
+});
+
+test('signalSpans: merges blinker flicker, keeps sides separate, sorted', () => {
+  const flicker = [23, 23.5, 24.5, 25, 26, 26.5, 27]; // blinker ticking on/off at 2 Hz sampling: one span
+  const S = drive(61, () => ({})).flatMap((s) => [s, { ...s, t: s.t + 0.5 }]).map((s) => ({ ...s, blinkerLeft: flicker.includes(s.t) || (s.t >= 31 && s.t <= 31.5), blinkerRight: s.t >= 40 && s.t <= 41 }));
+  assert.deepEqual(signalSpans(S), [{ side: 'left', start: 23, end: 27 }, { side: 'left', start: 31, end: 31.5 }, { side: 'right', start: 40, end: 41 }]);
+  assert.deepEqual(analyze(S).signals, signalSpans(S));
+  assert.deepEqual(signalSpans(drive(10)), []);
+  assert.equal(signalText({ side: 'left', start: 23, end: 31 }), 'Left indicator 0:23 to 0:31');
 });
