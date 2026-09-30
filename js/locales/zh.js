@@ -83,6 +83,7 @@ export default {
   "Honk": "鸣笛",
   "Emergency braking": "紧急制动",
   "Collision": "碰撞",
+  "Door handle pulled while locked": "锁车时拉动车门把手",
   "No events match this filter.": "没有符合此筛选条件的事件。",
   "Telemetry": "遥测",
   "Telemetry available": "有遥测数据",

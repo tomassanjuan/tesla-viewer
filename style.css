@@ -64,6 +64,11 @@ input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0 
 /* ---------- sidebar / library ---------- */
 #side{background:var(--surface);border-right:1px solid var(--border);padding:var(--s4);overflow:auto;display:flex;flex-direction:column;gap:var(--s2);min-width:0}
 .side-off #side{display:none}
+#app{position:relative}
+#sideResize{position:absolute;top:0;bottom:0;left:calc(var(--side-w) - 3px);width:7px;cursor:col-resize;touch-action:none;z-index:5;background:transparent;transition:background .15s}
+#sideResize:hover,#sideResize.drag,#sideResize:focus-visible{background:var(--accent,var(--mut));opacity:.55;border-radius:0;box-shadow:none}
+.side-off #sideResize{display:none}
+.resizing,.resizing *{cursor:col-resize!important;user-select:none!important}
 .brand{display:flex;align-items:center;gap:var(--s3)}
 .brand>div{flex:1;min-width:0}
 .brand h1{font-size:17px;letter-spacing:-.01em}
@@ -284,7 +289,7 @@ canvas{background:transparent}
   .side-open #side{transform:none;visibility:visible;transition:transform .22s ease}
   #scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s}
   .side-open #scrim{opacity:1;pointer-events:auto}
-  #sideToggle{display:none}
+  #sideToggle,#sideResize{display:none}
   .cat{min-height:36px}
 
   /* stage: one large camera + a swipeable strip of the others (tap a thumbnail to swap) */

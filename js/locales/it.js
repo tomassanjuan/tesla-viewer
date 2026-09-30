@@ -83,6 +83,7 @@ export default {
   "Honk": "Clacson",
   "Emergency braking": "Frenata d'emergenza",
   "Collision": "Collisione",
+  "Door handle pulled while locked": "Maniglia tirata a veicolo bloccato",
   "No events match this filter.": "Nessun evento corrisponde a questo filtro.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria disponibile",

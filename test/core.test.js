@@ -145,12 +145,17 @@ test('event.json reasons map to their own type with counts; unknown reasons keep
     { reason: 'user_interaction_dashcam_icon_tap' },
     { reason: 'user_interaction_honk' },
     { reason: 'sentry_collision_detected' },
+    { reason: 'sentry_locked_handle_pulled' },
+    { reason: 'sentry_accel' },
+    { reason: 'user_interaction_dashcam_icon_tapped' },
     { reason: 'brand_new_reason' },
     { reason: 'brand_new_reason' },
   ].map((j) => ({ ...j, category: 'sentry' }));
-  assert.deepEqual(countBy(samples, eventType), { emergency_braking: 1, person: 1, saved: 1, honk: 1, collision: 1, 'raw:brand_new_reason': 2 });
+  assert.deepEqual(countBy(samples, eventType), { emergency_braking: 1, person: 1, saved: 2, honk: 1, collision: 1, handle: 1, motion: 1, 'raw:brand_new_reason': 2 });
   assert.equal(filterEvents(samples, { type: 'raw:brand_new_reason' }).length, 2);
   assert.equal(formatEventInfo({ reason: 'vehicle_auto_emergency_braking' }).reason, 'Emergency braking');
+  for (const r of ['sentry_locked_handle_pulled', 'sentry_accel', 'user_interaction_honk', 'user_interaction_dashcam_icon_tapped', 'user_interaction_dashcam_panel_save', 'sentry_aware_object_detection'])
+    assert.ok(!formatEventInfo({ reason: r }).reason.includes('_'), r);
 });
 
 test('groupEvents by day / city; formatEventInfo city', async () => {

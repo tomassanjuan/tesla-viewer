@@ -83,6 +83,7 @@ export default {
   "Honk": "Klakson",
   "Emergency braking": "Hamowanie awaryjne",
   "Collision": "Kolizja",
+  "Door handle pulled while locked": "Pociągnięto klamkę przy zablokowanym aucie",
   "No events match this filter.": "Brak zdarzeń pasujących do filtra.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria dostępna",
