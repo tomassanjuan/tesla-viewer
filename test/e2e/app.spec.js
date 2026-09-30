@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeTeslaCam, writeTelemetryEdges, writeTurnTrip, TURN_TRIP } from './fixtures.js';
+import { writeTeslaCam, writeTelemetryEdges, writeTurnTrip, TURN_TRIP, writeAebEvent, AEB_EVENT } from './fixtures.js';
 
 let root, folder;
 test.beforeAll(() => { root = mkdtempSync(join(tmpdir(), 'tv-e2e-')); folder = writeTeslaCam(root); });
@@ -348,4 +348,17 @@ test('loading overlay never sticks: overlapping segment loads and a failing cam 
   // fixtures are not decodable, so every cam errors: the failure is named, non-blocking, and the app stays usable
   await expect(page.locator('#vidwarn')).toContainText(/Could not load: .*Front/);
   await expect(page.locator('#play')).toBeEnabled();
+});
+
+test('an emergency-braking clip always shows its event.json cue at the trigger time', async ({ page }) => {
+  const dir = mkdtempSync(join(tmpdir(), 'tv-aeb-'));
+  try {
+    await page.locator('#pickDir').setInputFiles(writeAebEvent(dir));
+    await expect(page.locator('#events .ev').first()).toBeVisible();
+    const cue = page.locator('.ins-tick.trigger');
+    await expect(cue).toHaveCount(1);
+    await expect(cue).toHaveAttribute('title', `Emergency braking · event trigger · ${Math.floor(AEB_EVENT.triggerS / 60)}:${AEB_EVENT.triggerS % 60}`);
+    // 2 clips of 60 s, the cue sits 75/120 of the way along the bar
+    expect(parseFloat(await cue.evaluate((e) => e.style.left))).toBeCloseTo((75 / 120) * 100, 0);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

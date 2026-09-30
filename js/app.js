@@ -1,5 +1,5 @@
 import { groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
-import { init as initInsights } from './insights.js';
+import { init as initInsights, applyAccel, triggerTime } from './insights.js';
 import { parseClipBlob, probeSei } from './mp4.js';
 import { typeIcon } from './icons.js';
 import { clipKey, getClip, setClip, getProbe, setProbe } from './telecache.js';
@@ -47,7 +47,7 @@ async function addFiles(list) {
   }
   events = groupFiles(items);
   scan.set(0, events.length, 'Reading events');
-  for (const [i, e] of events.entries()) if (scan.set(i + 1), e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; } catch { /* bad json: ignore */ } }
+  for (const [i, e] of events.entries()) if (scan.set(i + 1), e.eventJson) { try { const j = JSON.parse(await e.eventJson.text()); e.info = formatEventInfo(j); e.reason = String(j.reason ?? ''); e.city = e.info.city; e.triggerMs = Date.parse(j.timestamp); } catch { /* bad json: ignore */ } }
   } finally { scan.end(); }
   filter.category = ''; filter.type = ''; filter.q = ''; filter.tele = false; $('q').value = '';
   renderEvents();
@@ -305,6 +305,7 @@ async function openEvent(e) {
   const geo = samples.filter((m) => m.lat || m.lon);
   let maxKmh = 1; for (const m of samples) maxKmh = Math.max(maxKmh, m.speedMps * 3.6);
   dashT = 0;
+  applyAccel(samples);
   ev = { e, cams, segs, samples, total: t0, geo, maxKmh, codec, diag };
   gapT = null; layoutGaps();
   focusCam = cams.includes('front') ? 'front' : cams[0];
@@ -330,6 +331,8 @@ function layoutGaps() {
   for (const s of ev.segs) { if (gapMode === 'through') t += s.gapBefore; s.start = t; t += s.dur; }
   ev.total = t;
   for (const m of ev.samples) m.t = m._l + m._s.start;
+  const tt = triggerTime(ev.segs, ev.e.triggerMs);
+  ev.trigger = tt == null ? null : { t: tt, kind: 'trigger', label: ev.e.info?.reason || 'Event', note: 'event trigger' };
   $('seekwrap').querySelectorAll('.gap').forEach((n) => n.remove());
   ev.segs.forEach((s) => {
     if (!s.gapBefore) return;
@@ -531,7 +534,7 @@ function updateUi() {
       `<div class="h-bar brake"><b>${m.brake ? 'ON' : '0%'}</b><i style="--v:${m.brake ? 100 : 0}%"></i><span class="k">BRK</span></div></div>` +
       `<div class="h-turn">${arrow('left', m.blinkerLeft)}${arrow('right', m.blinkerRight)}</div>` +
       `<div class="h-ap ap${m.autopilot}">${AUTOPILOT[m.autopilot] ?? ''}</div>` +
-      `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl(m.ay / 9.81) * 40}%;--y:${50 - cl(m.ax / 9.81) * 40}%"></u></i><span class="k">${(m.ax / 9.81).toFixed(2)} / ${(m.ay / 9.81).toFixed(2)} G</span></div>`;
+      `<div class="h-g" title="G-force"><i><u style="--x:${50 + cl((m.gLat ?? m.ay) / 9.81) * 40}%;--y:${50 - cl((m.gLon ?? m.ax) / 9.81) * 40}%"></u></i><span class="k">${((m.gLon ?? m.ax) / 9.81).toFixed(2)} / ${((m.gLat ?? m.ay) / 9.81).toFixed(2)} G</span></div>`;
     if (html !== lastHud) { lastHud = html; $('hud').innerHTML = html; }
   }
   updateTopbar(ev, segIdx, t, m, $('units').value);
