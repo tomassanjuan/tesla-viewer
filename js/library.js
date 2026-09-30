@@ -119,18 +119,60 @@ export function formatEventInfo(j) {
   return { reason, place, city: String(j.city ?? '').trim() };
 }
 
-export const GROUPS = ['none', 'day', 'city'];
-/** Split events into [{ key, events }] by 'day' (first segment's date) or 'city' (event.json city; '' = unknown, last). 'none' = one group. */
+export const GROUPS = ['none', 'day', 'month', 'city', 'type', 'kind', 'cams', 'length'];
+export const SORTS = ['newest', 'oldest', 'longest', 'shortest', 'cams'];
+export const camCount = (e) => new Set(e.segments.flatMap((s) => Object.keys(s.cams))).size;
+export const LENGTH_BUCKETS = ['10+', '5-10', '2-5', '<2'];
+const lengthBucket = (e) => { const n = e.segments.length; return n >= 10 ? '10+' : n >= 5 ? '5-10' : n >= 2 ? '2-5' : '<2'; };
+const typeRank = (k) => { const i = EVENT_TYPES.indexOf(k); return i >= 0 ? i : k ? EVENT_TYPES.length : EVENT_TYPES.length + 1; };
+
+/** Sorted copy of events: newest/oldest by start time, longest/shortest by segment count, cams = most cameras first (ties newest first). */
+export function sortEvents(events, by = 'newest') {
+  const t = (e) => +e.start;
+  const cmp = {
+    newest: (a, b) => t(b) - t(a),
+    oldest: (a, b) => t(a) - t(b),
+    longest: (a, b) => b.segments.length - a.segments.length || t(b) - t(a),
+    shortest: (a, b) => a.segments.length - b.segments.length || t(b) - t(a),
+    cams: (a, b) => camCount(b) - camCount(a) || t(b) - t(a),
+  }[by] ?? ((a, b) => t(b) - t(a));
+  return [...events].sort(cmp);
+}
+
+/** Group key of one event: '' = unknown/none (rendered last where it applies). */
+function groupKey(e, by) {
+  switch (by) {
+    case 'day': return e.segments[0]?.ts.slice(0, 10) ?? '';
+    case 'month': return e.segments[0]?.ts.slice(0, 7) ?? '';
+    case 'city': return e.city ?? '';
+    case 'type': return eventType(e) ?? '';
+    case 'kind': return e.kind;
+    case 'cams': return String(camCount(e));
+    case 'length': return lengthBucket(e);
+    default: return '';
+  }
+}
+
+/** Split events into [{ key, events }] by one of GROUPS, keeping the incoming event order inside each group.
+ *  day/month keep first-appearance order (follows the sort); city is alphabetical, unknown last; type follows EVENT_TYPES
+ *  (other reasons alphabetical, no type last); kind = trips then events; cams = most first; length = longest first. 'none' = one group. */
 export function groupEvents(events, by = 'none') {
-  if (by !== 'day' && by !== 'city') return [{ key: '', events }];
+  if (!GROUPS.includes(by) || by === 'none') return [{ key: '', events }];
   const m = new Map();
   for (const e of events) {
-    const k = by === 'day' ? (e.segments[0]?.ts.slice(0, 10) ?? '') : (e.city ?? '');
+    const k = groupKey(e, by);
     if (!m.has(k)) m.set(k, []);
     m.get(k).push(e);
   }
   const out = [...m].map(([key, events]) => ({ key, events }));
-  return by === 'city' ? out.sort((a, b) => !a.key - !b.key || a.key.localeCompare(b.key)) : out;
+  const order = {
+    city: (a, b) => !a.key - !b.key || a.key.localeCompare(b.key),
+    type: (a, b) => typeRank(a.key) - typeRank(b.key) || a.key.localeCompare(b.key),
+    kind: (a, b) => (a.key === 'trip' ? -1 : 1) - (b.key === 'trip' ? -1 : 1),
+    cams: (a, b) => b.key - a.key,
+    length: (a, b) => LENGTH_BUCKETS.indexOf(a.key) - LENGTH_BUCKETS.indexOf(b.key),
+  }[by];
+  return order ? out.sort(order) : out;
 }
 
 export function tsToDate(ts) {

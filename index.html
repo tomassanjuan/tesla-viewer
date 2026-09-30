@@ -47,7 +47,10 @@
   <h2 class="eyebrow">Library</h2>
   <div id="cats" class="cats" role="group" aria-label="Category"></div>
   <div id="evtype" class="cats" role="group" aria-label="Event type"></div>
-  <div id="groupby" class="seg" aria-label="Group by" hidden><button type="button" data-v="none">None</button><button type="button" data-v="day" class="on">Day</button><button type="button" data-v="city">City</button></div>
+  <div class="ctl" id="libctl" hidden>
+    <span class="ctl-l">Group by</span><div id="groupby" class="seg" aria-label="Group by"><button type="button" data-v="none">None</button><button type="button" data-v="day" class="on">Day</button><button type="button" data-v="month">Month</button><button type="button" data-v="city">City</button><button type="button" data-v="type">Type</button><button type="button" data-v="kind">Kind</button><button type="button" data-v="cams">Cameras</button><button type="button" data-v="length">Length</button></div>
+    <span class="ctl-l">Sort by</span><div id="sortby" class="seg" aria-label="Sort by"><button type="button" data-v="newest" class="on">Newest</button><button type="button" data-v="oldest">Oldest</button><button type="button" data-v="longest">Longest</button><button type="button" data-v="shortest">Shortest</button><button type="button" data-v="cams">Most cams</button></div>
+  </div>
   <div id="events" role="list"></div>
   <details id="crypt"><summary>Encrypted clips (2026.20+) <em>experimental</em></summary>
     <p class="note">Decryption runs locally. The per-file key comes from Tesla, tied to your account.</p>

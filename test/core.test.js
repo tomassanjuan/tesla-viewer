@@ -191,3 +191,27 @@ test('probeSei: finds mdat behind a large moov by reading box headers only', asy
   assert.equal(await probeSei(mk(slice)), false);
   assert.equal(await probeSei(new Blob([box('ftyp', new Uint8Array(4))])), null);
 });
+
+test('sortEvents and groupEvents: month / type / kind / cams / length', async () => {
+  const { groupEvents, sortEvents } = await import('../js/library.js');
+  const mk = (ts, n, o = {}) => ({ start: new Date(ts.replace('_', 'T').replace(/-(\d\d)-(\d\d)$/, ':$1:$2')), segments: Array.from({ length: n }, () => ({ ts, cams: { front: 1, back: 1, ...(o.cams ?? {}) } })), kind: 'event', ...o });
+  const a = mk('2026-05-01_10-00-00', 1, { reason: 'sentry_aware_object_detection' });
+  const b = mk('2026-06-02_10-00-00', 12, { kind: 'trip', cams: { left_pillar: 1 } });
+  const c = mk('2026-06-03_10-00-00', 6, { reason: 'vehicle_auto_emergency_braking' });
+  const d = mk('2026-06-03_09-00-00', 3, { reason: 'weird_thing' });
+  const evs = [a, b, c, d];
+  const ids = (l) => l.map((e) => evs.indexOf(e));
+  assert.deepEqual(ids(sortEvents(evs, 'newest')), [2, 3, 1, 0]);
+  assert.deepEqual(ids(sortEvents(evs, 'oldest')), [0, 1, 3, 2]);
+  assert.deepEqual(ids(sortEvents(evs, 'longest')), [1, 2, 3, 0]);
+  assert.deepEqual(ids(sortEvents(evs, 'shortest')), [0, 3, 2, 1]);
+  assert.deepEqual(ids(sortEvents(evs, 'cams')), [1, 2, 3, 0]);
+  assert.equal(evs[0], a, 'input not mutated');
+  const g = (by) => groupEvents(sortEvents(evs), by).map((x) => [x.key, x.events.length]);
+  assert.deepEqual(g('month'), [['2026-06', 3], ['2026-05', 1]]);
+  assert.deepEqual(g('type'), [['emergency_braking', 1], ['person', 1], ['raw:weird_thing', 1], ['', 1]]);
+  assert.deepEqual(g('kind'), [['trip', 1], ['event', 3]]);
+  assert.deepEqual(g('cams'), [['3', 1], ['2', 3]]);
+  assert.deepEqual(g('length'), [['10+', 1], ['5-10', 1], ['2-5', 1], ['<2', 1]]);
+  assert.equal(groupEvents(evs, 'bogus').length, 1);
+});
