@@ -15,6 +15,7 @@ import { spatialLayout } from './layout.js';
 import { parseHeader } from './tesla-crypto.js';
 import { initDecryptUi } from './decrypt-ui.js';
 import { mountBusy } from './progress.js';
+import { waitLoaded } from './videoload.js';
 import { due, pickDriftFix, shouldPlay, initPerf } from './perf.js';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -360,19 +361,25 @@ let dashT = 0, dashLast = 0;
 const solo = () => lowLoad || $('layout').value === 'focus'; // only the focused tile is visible/needed
 const master = () => (solo() && vids[focusCam]?.src ? vids[focusCam] : vids[ev.cams.find((c) => vids[c]?.src)] ?? Object.values(vids)[0]);
 
+let loadCtl;   // aborts the previous loadSeg when a newer one starts (seek/scrub/auto-advance/new clip), so its busy task always ends
 async function loadSeg(i, at) {
+  loadCtl?.abort(); const ctl = loadCtl = new AbortController();
   segIdx = i;
-  const s = ev.segs[i], task = busy.begin('Loading video');
+  const s = ev.segs[i], task = busy.begin('Loading video'), failed = [];
+  $('vidwarn').textContent = '';
   try {
-  await Promise.all(ev.cams.map((c) => new Promise((res) => {
-    const v = vids[c], f = s.cams[c];
-    if (v.src) URL.revokeObjectURL(v.src);
-    if (!f || (encrypted.has(f) && !decrypted.has(f))) { v.removeAttribute('src'); v.load(); return res(); }
-    v.onloadedmetadata = () => { v.currentTime = at; v.playbackRate = +$('speed').value; res(); };
-    v.onerror = () => res();
-    v.src = URL.createObjectURL(resolve(f));
-  })));
+    await Promise.all(ev.cams.map(async (c) => {
+      const v = vids[c], f = s.cams[c];
+      if (v.src) URL.revokeObjectURL(v.src);
+      if (!f || (encrypted.has(f) && !decrypted.has(f))) { v.removeAttribute('src'); v.load(); return; }
+      v.src = URL.createObjectURL(resolve(f));
+      const r = await waitLoaded(v, { signal: ctl.signal });
+      if (r === 'ok') { v.currentTime = at; v.playbackRate = +$('speed').value; }
+      else if (r !== 'aborted') failed.push(`${NAMES[c]} (${r})`);
+    }));
   } finally { task.end(); }
+  if (ctl.signal.aborted) return;   // superseded: the newer call finishes the job
+  if (failed.length) $('vidwarn').textContent = `Could not load: ${failed.join(', ')}. Other cameras keep playing.`;
   updateUi();
   if (wantPlay) playAll();
 }
@@ -384,7 +391,7 @@ function resync(at = master()?.currentTime) { if (at != null) for (const v of Ob
 const syncPlayState = () => { for (const [c, v] of Object.entries(vids)) { if (!v.src) continue; if (!dash() && playing && shouldPlay(c, focusCam, solo())) v.play().catch(() => {}); else v.pause(); } };
 function playAll() { playing = true; dashLast = performance.now(); $('play').classList.add('is-playing'); syncPlayState(); requestAnimationFrame(tick); }
 function pauseAll() { playing = false; $('play').classList.remove('is-playing'); for (const v of Object.values(vids)) v.pause(); }
-function stop() { wantPlay = false; if (ev) pauseAll(); }
+function stop() { wantPlay = false; loadCtl?.abort(); if (ev) pauseAll(); }
 
 // the master must keep playing, so in low-load mode it is the focused camera
 const videoTime = () => ev.segs[segIdx].start + (master()?.currentTime ?? 0);
