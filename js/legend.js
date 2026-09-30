@@ -4,9 +4,8 @@ import { t } from './i18n.js';
 
 export const COLOR = {
   speed: '--fg', ap: '--info', throttle: '--info', brake: '--accent', playhead: '--accent',
-  played: '--accent', gap: '--warn', trim: '--warn', trail: '--info', position: '--accent',
+  played: '--accent', gap: '--warn', trim: '--warn', driven: '--route-driven', ahead: '--route-ahead', position: '--accent',
 };
-export const ROUTE_AHEAD = 'rgba(139,147,161,.55)'; // map: part of the route not yet driven (not a theme var)
 
 // kind selects the swatch shape (see .lg-* in style.css); color is a CSS var name or literal color.
 export const LEGEND = [
@@ -23,8 +22,8 @@ export const LEGEND = [
     { kind: 'bar', color: COLOR.trim, label: 'Trim start / end' },
   ] },
   { id: 'map', title: 'Map', items: [
-    { kind: 'line', color: COLOR.trail, label: 'Route so far' },
-    { kind: 'line', color: ROUTE_AHEAD, label: 'Route ahead' },
+    { kind: 'line', color: COLOR.driven, label: 'Driven' },
+    { kind: 'line', color: COLOR.ahead, label: 'Ahead' },
     { kind: 'dot', color: COLOR.position, label: 'Current position' },
   ] },
 ];

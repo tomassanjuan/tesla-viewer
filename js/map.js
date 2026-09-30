@@ -1,6 +1,6 @@
 // Map panel: OpenStreetMap tiles by default (toggle, persisted); offline canvas track when off/offline/tile fails.
 import { t } from './i18n.js';
-import { COLOR, ROUTE_AHEAD } from './legend.js';
+import { COLOR } from './legend.js';
 const css = (v) => (typeof getComputedStyle === 'function' ? getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888' : '#888');
 const TS = 256;
 
@@ -30,6 +30,17 @@ export function fitZoomFrac(b, w, h, pad = 10, maxZ = 18) {
   const [x0, y0] = project(b.maxLat, b.minLon, 0), [x1, y1] = project(b.minLat, b.maxLon, 0);
   const r = Math.min((w - 2 * pad) / (x1 - x0 || 1e-9), (h - 2 * pad) / (y1 - y0 || 1e-9));
   return Math.max(0, Math.min(maxZ, Math.log2(Math.max(r, 1e-9))));
+}
+// Split a route at the playback sample: driven = points up to cur, ahead = cur onward (shared joint so the line is continuous).
+// Matches by time (cur may be a sample without GPS, so it is not necessarily in pts); falls back to identity when untimed.
+export function splitRoute(pts, cur) {
+  let ci = 0;
+  if (cur && typeof cur.t === 'number' && pts.every((p) => typeof p.t === 'number')) {
+    let lo = 0, hi = pts.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (pts[mid].t <= cur.t) lo = mid; else hi = mid - 1; }
+    ci = lo;
+  } else ci = Math.max(0, pts.indexOf(cur));
+  return { ci, driven: pts.slice(0, ci + 1), ahead: pts.slice(ci) };
 }
 export function bounds(pts) {
   const la = pts.map((p) => p.lat), lo = pts.map((p) => p.lon);
@@ -94,7 +105,7 @@ export function createMap(canvas) {
     const pts = (points || []).filter((s) => s.lat || s.lon);
     x.font = '10px sans-serif';
     if (!pts.length) { x.fillStyle = css('--mut'); x.fillText(t('No GPS'), 10, 20); return; }
-    const ci = Math.max(0, pts.indexOf(cur)), me = pts[ci], b = bounds(pts);
+    const { ci, driven, ahead } = splitRoute(pts, cur), me = pts[ci], b = bounds(pts);
     const fit = { lat: (b.minLat + b.maxLat) / 2, lon: (b.minLon + b.maxLon) / 2, z: fitZoomFrac(b, W, H, 14) };
     if (!view) view = { ...fit };
     if (mode === 'fit') view = fit; else if (mode === 'follow') view = { ...view, lat: me.lat, lon: me.lon };
@@ -116,8 +127,8 @@ export function createMap(canvas) {
       x.strokeStyle = col; x.lineWidth = lw; x.lineJoin = 'round'; x.beginPath();
       arr.forEach((p, i) => { const [a, c] = P(p); i ? x.lineTo(a, c) : x.moveTo(a, c); }); x.stroke();
     };
-    line(pts.slice(ci), ROUTE_AHEAD, 2); // future, dimmed
-    line(pts.slice(0, ci + 1), css(COLOR.trail), 3); // trail so far
+    line(ahead, css(COLOR.ahead), 2.5); // upcoming, muted
+    line(driven, css(COLOR.driven), 3.5); // already driven, highlighted
     const [a, c] = P(me);
     x.save(); x.translate(a, c); x.lineWidth = 1.5; x.strokeStyle = '#fff'; x.fillStyle = css(COLOR.position); x.beginPath();
     if (typeof me.heading === 'number' && isFinite(me.heading)) {
