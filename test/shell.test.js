@@ -27,3 +27,13 @@ test('version badge and language chips live in the always-visible top bar, not t
   assert.ok(read('js/i18n.js').includes("getElementById('mbar')") && !read('js/i18n.js').includes('extras-side'), 'language chips mount into #mbar');
   assert.ok(!/#mbar\{display:none/.test(read('style.css').replace(/\s/g, '')), '#mbar must not be hidden on desktop');
 });
+
+test('desktop polish is scoped to a media query that excludes the phone layout, and library styling lives in CSS', () => {
+  const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+  const css = read('style.css'), app = read('js/app.js');
+  const block = css.slice(css.indexOf('UI polish: desktop header'));
+  assert.ok(block.includes('@media (min-width:861px) and (not ((orientation:landscape) and (max-height:520px) and (max-width:1000px))){'), 'desktop block must exclude the phone media query');
+  assert.ok(block.includes('.dock-row{display:grid'), 'dock is a two-row grid on desktop');
+  assert.ok(!/style\.cssText = 'display:block;grid-column/.test(app) && app.includes("im.className = 'ev-thumb'"), 'thumbnail styling belongs in CSS (.ev-thumb)');
+  assert.ok(css.includes('.ev-thumb{') && css.includes('.cat .n{'), 'thumb and chip-count styles exist');
+});
