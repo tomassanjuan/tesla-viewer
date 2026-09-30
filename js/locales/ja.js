@@ -83,6 +83,7 @@ export default {
   "Honk": "クラクション",
   "Emergency braking": "緊急ブレーキ",
   "Collision": "衝突",
+  "Door handle pulled while locked": "施錠中にドアハンドルを引かれた",
   "No events match this filter.": "このフィルターに一致するイベントはありません。",
   "Telemetry": "テレメトリ",
   "Telemetry available": "テレメトリあり",

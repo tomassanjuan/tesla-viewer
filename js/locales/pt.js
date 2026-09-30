@@ -83,6 +83,7 @@ export default {
   "Honk": "Buzina",
   "Emergency braking": "Frenagem de emergência",
   "Collision": "Colisão",
+  "Door handle pulled while locked": "Maçaneta puxada com o carro trancado",
   "No events match this filter.": "Nenhum evento corresponde a este filtro.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria disponível",
