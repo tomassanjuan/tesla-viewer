@@ -87,6 +87,8 @@ export default {
   "No events match this filter.": "このフィルターに一致するイベントはありません。",
   "Telemetry": "テレメトリ",
   "Telemetry available": "テレメトリあり",
+  "Checking telemetry… {n} left": "テレメトリを確認中… 残り{n}件",
+  "Only clips with telemetry": "テレメトリありのクリップのみ",
   "Group by": "グループ化",
   "No grouping": "グループ化なし",
   "Day": "日",
