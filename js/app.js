@@ -59,9 +59,10 @@ let groupBy = pref('groupBy', GROUPS, 'day'), sortBy = pref('sortBy', SORTS, 'ne
 const collapsed = new Set();   // `${groupBy}:${key}` of collapsed group headers (session only)
 const visibleEvents = () => sortEvents(filterEvents(events, filter), sortBy);
 
+// Shared event-type labels (filter chips and Type groups); unknown reasons show their own text.
+const typeLabel = (k) => ({ person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), handle: t('Door handle pulled while locked'), saved: t('Saved by you') })[k] ?? (k ? k.slice(RAW_PREFIX.length) : t('No type'));
 function renderFilters() {
   const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
-  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), handle: t('Door handle pulled while locked'), saved: t('Saved by you') };
   const box = $('cats'); box.innerHTML = '';
   const byCat = countBy(events, (e) => e.category);
   const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
@@ -77,7 +78,7 @@ function renderFilters() {
   const keys = [...EVENT_TYPES, ...Object.keys(byType).filter((k) => k.startsWith(RAW_PREFIX)).sort()];
   for (const k of keys) if (byType[k]) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'cat' + (filter.type === k ? ' on' : '');
-    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${TYPE_LABEL[k] ?? k.slice(RAW_PREFIX.length)} ${byType[k]}`;
+    b.setAttribute('aria-pressed', filter.type === k); b.textContent = `${typeLabel(k)} ${byType[k]}`;
     b.onclick = () => { filter.type = filter.type === k ? '' : k; renderEvents(); };
     tbox.append(b);
   }
@@ -113,10 +114,9 @@ function renderEvents() {
     e._el = d; into.append(d);
     watchTelemetry(e, d);
   };
-  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), saved: t('Saved by you') };
   const groupLabel = (k) => ({
     day: k, month: k, city: k || t('Unknown'),
-    type: TYPE_LABEL[k] ?? (k ? k.slice(RAW_PREFIX.length) : t('No type')),
+    type: typeLabel(k),
     kind: k === 'trip' ? t('Trips') : t('Events'),
     cams: t('{n} cams', { n: k }),
     length: k === '<2' ? '< 2 min' : k === '10+' ? '10+ min' : `${k.replace('-', '–')} min`,
