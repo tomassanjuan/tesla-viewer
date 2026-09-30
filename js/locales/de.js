@@ -83,6 +83,7 @@ export default {
   "Honk": "Hupe",
   "Emergency braking": "Notbremsung",
   "Collision": "Kollision",
+  "Door handle pulled while locked": "Türgriff bei Verriegelung gezogen",
   "No events match this filter.": "Keine Ereignisse passen zu diesem Filter.",
   "Telemetry": "Telemetrie",
   "Telemetry available": "Telemetrie verfügbar",

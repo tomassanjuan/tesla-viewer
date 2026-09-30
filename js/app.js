@@ -57,7 +57,7 @@ const visibleEvents = () => filterEvents(events, filter);
 
 function renderFilters() {
   const CAT_LABEL = { recent: t('Recent'), saved: t('Saved'), sentry: t('Sentry'), loose: t('Loose clips') };
-  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), saved: t('Saved by you') };
+  const TYPE_LABEL = { person: t('Person or object detected'), motion: t('Motion detected'), honk: t('Honk'), emergency_braking: t('Emergency braking'), collision: t('Collision'), handle: t('Door handle pulled while locked'), saved: t('Saved by you') };
   const box = $('cats'); box.innerHTML = '';
   const byCat = countBy(events, (e) => e.category);
   const tabs = [['', t('All'), events.length], ...CATEGORIES.filter((c) => byCat[c]).map((c) => [c, CAT_LABEL[c], byCat[c]])];
