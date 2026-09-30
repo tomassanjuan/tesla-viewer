@@ -66,6 +66,8 @@ export default {
   "{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.": "{msg}. Bij een CORS- of netwerkfout: haal de sleutels op een andere manier op en plak ze als JSON.",
   "Bad JSON: {msg}": "Ongeldige JSON: {msg}",
   "No GPS": "Geen GPS",
+  "Driven": "Gereden",
+  "Ahead": "Nog te rijden",
   "Range too short": "Bereik te kort",
   "Export failed: {msg}": "Exporteren mislukt: {msg}",
   "Exporting {pct}% ({n} segment(s))": "Exporteren {pct}% ({n} segment(en))",
