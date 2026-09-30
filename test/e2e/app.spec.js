@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeTeslaCam, writeTurnTrip, TURN_TRIP } from './fixtures.js';
+import { writeTeslaCam, writeTelemetryEdges, writeTurnTrip, TURN_TRIP } from './fixtures.js';
 
 let root, folder;
 test.beforeAll(() => { root = mkdtempSync(join(tmpdir(), 'tv-e2e-')); folder = writeTeslaCam(root); });
@@ -144,6 +144,16 @@ test('telemetry badge: SEI clips (incl. a 3 MB moov) show it, clips without SEI 
   await expect(evt(page, '2026-03-02_10-00-00').locator('.tele')).toBeVisible();
   await expect(page.locator('#events .ev', { hasText: 'Trip' }).locator('.tele')).toBeVisible();
   await expect(evt(page, '2026-03-03_22-00-00').locator('.tele')).toHaveCount(0);
+});
+
+test('telemetry badge: SEI after a big first slice, or on a non-front cam, still shows it', async ({ page }) => {
+  const edges = mkdtempSync(join(tmpdir(), 'tv-e2e-edges-'));
+  await page.locator('#pickDir').setInputFiles(writeTelemetryEdges(edges));
+  await expect(page.locator('#events .ev').first()).toBeVisible();
+  for (const el of await page.locator('#events .ev').all()) await el.scrollIntoViewIfNeeded();
+  await expect(evt(page, '2026-03-05_09-00-00').locator('.tele')).toBeVisible();
+  await expect(evt(page, '2026-03-06_09-00-00').locator('.tele')).toBeVisible();
+  rmSync(edges, { recursive: true, force: true });
 });
 
 test('big moov clip parses and shows telemetry HUD', async ({ page }) => {

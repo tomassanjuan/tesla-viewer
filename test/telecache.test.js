@@ -19,15 +19,31 @@ test('parseClipBlob gives the same result as parseClip when telemetry is present
 });
 
 test('parseClipBlob proves absence from moov + the head of mdat only', async () => {
-  const c = makeClip({ sei: false, frames: 60000 });
+  const c = makeClip({ sei: false, frames: 3000, idrPad: 2_000_000 });
   const blob = counted(c);
   const r = await parseClipBlob(blob);
   const full = parseClip(ab(c));
   assert.equal(r.samples.length, 0);
   assert.ok(Math.abs(r.duration - full.duration) < 1e-9);
   assert.deepEqual([r.codec, r.width, r.height, r.created], [full.codec, full.width, full.height, full.created]);
-  assert.ok(blob.bytes < c.length / 2, `read ${blob.bytes} of ${c.length} bytes`);
-  assert.ok(blob.bytes < 200000);
+  assert.ok(blob.bytes < c.length / 4, `read ${blob.bytes} of ${c.length} bytes`);
+  assert.ok(blob.bytes < 600000);
+});
+
+test('parseClipBlob never concludes absence from the first frame: late SEI is still parsed', async () => {
+  // frame 0 has no SEI and a 300 KB IDR; SEI starts on frame 1
+  const early = makeClip({ frames: 100, seiFrom: 1, idrPad: 300000 });
+  const e = await parseClipBlob(new Blob([early]));
+  assert.equal(e.samples.length, 99);
+  assert.deepEqual(e, parseClip(ab(early)));
+  // SEI only in the last 100 of 3000 frames, behind a 2 MB IDR: found by the sampled windows, not the first NALs
+  const late = makeClip({ frames: 3000, seiFrom: 2900, idrPad: 2_000_000 });
+  const l = await parseClipBlob(new Blob([late]));
+  assert.equal(l.samples.length, 100);
+  assert.deepEqual(l, parseClip(ab(late)));
+  // SEI beginning mid-file
+  const mid = makeClip({ frames: 3000, seiFrom: 1400, idrPad: 2_000_000 });
+  assert.equal((await parseClipBlob(new Blob([mid]))).samples.length, 1600);
 });
 
 test('parseClipBlob still reads everything when the head is inconclusive or not MP4', async () => {

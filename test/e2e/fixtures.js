@@ -22,13 +22,14 @@ function seiNal({ speed, lat, lon, seq, accel = 0.3, ax = 0, ay = 0 }) {
 
 /**
  * opts: sei (default true), frames (30), fps (30), speed0 (m/s at first frame, ramps +0.5/frame), lat/lon,
- *       ay(frame) (lateral m/s2, default 0), moovPad (bytes of junk inside moov, to force a big moov before mdat).
+ *       ay(frame) (lateral m/s2, default 0), moovPad (bytes of junk inside moov, to force a big moov before mdat),
+ *       seiFrom (first frame that carries SEI), idrPad (bytes of slice data in the first frame: a real IDR is 100+ KB).
  */
-export function makeClip({ sei = true, frames = 30, fps = 30, speed0 = 5, lat = 40.4, lon = -3.7, moovPad = 0, ay = () => 0 } = {}) {
+export function makeClip({ sei = true, frames = 30, fps = 30, speed0 = 5, lat = 40.4, lon = -3.7, moovPad = 0, ay = () => 0, seiFrom = 0, idrPad = 0 } = {}) {
   const nals = [];
   for (let i = 0; i < frames; i++) {
-    if (sei) nals.push(seiNal({ speed: speed0 + i * 0.5, lat: lat + i * 1e-5, lon: lon + i * 1e-5, seq: i, ay: ay(i) }));
-    nals.push(i === 0 ? [0x65, 1, 2, 3] : [0x41, 9, 9]);
+    if (sei && i >= seiFrom) nals.push(seiNal({ speed: speed0 + i * 0.5, lat: lat + i * 1e-5, lon: lon + i * 1e-5, seq: i, ay: ay(i) }));
+    nals.push(i === 0 ? [0x65, 1, 2, 3, ...new Uint8Array(idrPad)] : [0x41, 9, 9]);
   }
   const mdatBody = Buffer.concat(nals.map((n) => Buffer.concat([u32(n.length), Buffer.from(n)])));
   const entry = Buffer.alloc(8 + 78); entry.write('avc1', 4); entry.writeUInt32BE(entry.length, 0);
@@ -71,6 +72,21 @@ export function writeTeslaCam(root) {
   const big = '2026-03-04_09-00-00';
   put(`SavedClips/${big}/${big}-front.mp4`, makeClip({ moovPad: 3 * 1024 * 1024 }));
   put(`SavedClips/${big}/event.json`, ev('user_interaction_honk', 'Madrid'));
+  return cam;
+}
+
+/** Telemetry-probe edge cases (separate folder so the library counts in other tests stay put):
+ * <late>: first frame has no SEI and a 300 KB IDR, SEI starts on frame 1; <backonly>: SEI on the back cam only. */
+export function writeTelemetryEdges(root) {
+  const cam = join(root, 'TeslaCam');
+  const put = (rel, data) => { const p = join(cam, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, data); };
+  const ev = JSON.stringify({ city: 'Madrid', reason: 'user_interaction_honk' });
+  const late = '2026-03-05_09-00-00', backOnly = '2026-03-06_09-00-00';
+  put(`SavedClips/${late}/${late}-front.mp4`, makeClip({ seiFrom: 1, idrPad: 300000 }));
+  put(`SavedClips/${late}/event.json`, ev);
+  put(`SavedClips/${backOnly}/${backOnly}-front.mp4`, makeClip({ sei: false }));
+  put(`SavedClips/${backOnly}/${backOnly}-back.mp4`, makeClip());
+  put(`SavedClips/${backOnly}/event.json`, ev);
   return cam;
 }
 

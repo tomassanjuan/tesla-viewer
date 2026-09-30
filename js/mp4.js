@@ -95,43 +95,52 @@ export function isMp4(u8) {
 }
 
 /**
- * Cheap telemetry probe on the first bytes of a clip (H.264 only): walks to mdat, then the NALs before the first
- * slice, looking for a Tesla SEI. Returns true/false, or null when the head can't tell (HEVC, no mdat in range).
+ * Cheap telemetry probe (H.264 only) that reads a few bytes per box/NAL instead of whole files: hops top-level boxes
+ * to mdat (moov may come first and be large), then hops length-prefixed NALs (slices are skipped, not read) looking for
+ * a Tesla SEI. If the hop budget runs out without one, four 64 KB windows spread across the mdat are searched too, so
+ * "no telemetry" is never concluded from the first frames alone. Returns true/false, or null when it can't tell
+ * (HEVC, truncated, no mdat).
  */
-export function hasSei(buffer) {
-  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
+export async function probeSei(blob, maxNals = 64) {
+  const head = async (pos, n) => new DataView(await blob.slice(pos, pos + n).arrayBuffer());
   let pos = 0;
-  for (; pos + 8 <= dv.byteLength; ) {
-    const size = dv.getUint32(pos);
-    if (ascii(dv, pos + 4) === 'mdat') break;
-    if (size < 8) return null;
-    pos += size;
-  }
-  if (pos + 8 > dv.byteLength) return null;
-  for (let c = pos + 8; c + 5 <= dv.byteLength;) {
-    const len = dv.getUint32(c); c += 4;
-    if (len < 1 || c + len > dv.byteLength) return null;
-    const type = u8[c] & 0x1f;
-    if (type === 6 && decodeSei(u8.subarray(c, c + len))) return true;
-    if (type === 5 || type === 1) return false;
-    c += len;
-  }
-  return null;
-}
-
-/** Blob version of hasSei: finds mdat via top-level box headers (moov may come first and be large), then reads only its first 64 KB. */
-export async function probeSei(blob) {
-  let pos = 0;
-  for (let i = 0; i < 16 && pos + 8 <= blob.size; i++) {
-    const h = new DataView(await blob.slice(pos, pos + 16).arrayBuffer());
-    if (h.byteLength < 8) return null;
+  for (let i = 0; ; i++) {
+    const h = await head(pos, 16);
+    if (i > 16 || h.byteLength < 8) return null;
     let size = h.getUint32(0);
-    if (ascii(h, 4) === 'mdat') return hasSei(await blob.slice(pos, pos + 65536).arrayBuffer());
+    if (ascii(h, 4) === 'mdat') { pos += 8; break; }
     if (size === 1 && h.byteLength >= 16) size = Number(h.getBigUint64(8));
     if (size < 8) return null;
     pos += size;
   }
-  return null;
+  const start = pos;
+  for (let i = 0; i < maxNals; i++) {
+    const h = await head(pos, 5);
+    if (h.byteLength < 5) return false;   // end of file: scanned everything
+    const len = h.getUint32(0), type = h.getUint8(4) & 0x1f;
+    if (len < 1 || pos + 4 + len > blob.size) return null;
+    if (type === 6 && decodeSei(new Uint8Array(await blob.slice(pos + 4, pos + 4 + len).arrayBuffer()))) return true;
+    pos += 4 + len;
+  }
+  // budget spent: sample windows across the rest of the file (SEI precedes every frame, so any window should hit one)
+  const span = blob.size - pos, W = 65536;
+  if (span <= 0) return false;
+  for (const at of [pos + span * 0.25, pos + span * 0.5, pos + span * 0.75, blob.size - W]) {
+    const from = Math.max(start, Math.floor(at));
+    if (windowHasSei(new Uint8Array(await blob.slice(from, from + W).arrayBuffer()))) return true;
+  }
+  return false;
+}
+
+/** True if a byte window (not aligned to NAL boundaries) contains a complete Tesla SEI NAL: 4-byte length, 06 05 <size> 42.. 69 <protobuf>. */
+export function windowHasSei(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  for (let i = 4; i + 4 < u8.length; i++) {
+    if (u8[i] !== 0x06 || u8[i + 1] !== 0x05 || u8[i + 3] !== 0x42) continue;
+    const len = dv.getUint32(i - 4);
+    if (len >= 8 && len <= 4096 && i + len <= u8.length && decodeSei(u8.subarray(i, i + len))) return true;
+  }
+  return false;
 }
 
 /** Top-level box headers of a Blob without reading payloads: [{ type, start, size }] (stops at the first mdat and moov, or `max` boxes). */
