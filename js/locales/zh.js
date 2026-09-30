@@ -66,6 +66,8 @@ export default {
   "{msg}. If this is a CORS/network error, fetch keys another way and paste them as JSON.": "{msg}。如果是 CORS 或网络错误，请通过其他方式获取密钥并以 JSON 粘贴。",
   "Bad JSON: {msg}": "JSON 无效：{msg}",
   "No GPS": "无 GPS",
+  "Driven": "已行驶",
+  "Ahead": "前方",
   "Range too short": "范围太短",
   "Export failed: {msg}": "导出失败：{msg}",
   "Exporting {pct}% ({n} segment(s))": "正在导出 {pct}%（{n} 个分段）",

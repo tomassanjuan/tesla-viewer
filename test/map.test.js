@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { latLonToTile, fitZoom, fitZoomFrac, unproject, project, tilesForView, bounds } from '../js/map.js';
+import { latLonToTile, fitZoom, fitZoomFrac, unproject, project, tilesForView, bounds, splitRoute, ROUTE_COLORS } from '../js/map.js';
 
 test('latLonToTile known values', () => {
   assert.deepEqual(latLonToTile(0, 0, 1), { x: 1, y: 1, z: 1 });
@@ -33,4 +33,17 @@ test('fitZoomFrac is fractional, monotonic, >= integer fit, clamped', () => {
   assert.ok(fitZoomFrac(b, 480, 240, 10) > f);
   assert.equal(fitZoomFrac({ minLat: 1, maxLat: 1, minLon: 1, maxLon: 1 }, 240, 120), 18);
   assert.equal(fitZoomFrac({ minLat: -80, maxLat: 80, minLon: -179, maxLon: 179 }, 240, 120), 0);
+});
+test('splitRoute splits by time, even when cur has no GPS point of its own', () => {
+  const pts = [0, 1, 2, 3, 4].map((t) => ({ t, lat: 37 + t / 1e4, lon: -122 }));
+  const r = splitRoute(pts, { t: 2.5, lat: 0, lon: 0 });
+  assert.equal(r.ci, 2);
+  assert.deepEqual(r.driven.map((p) => p.t), [0, 1, 2]);
+  assert.deepEqual(r.ahead.map((p) => p.t), [2, 3, 4]);
+  assert.equal(splitRoute(pts, { t: -1 }).ci, 0);
+  assert.equal(splitRoute(pts, { t: 99 }).ahead.length, 1);
+  assert.equal(splitRoute(pts, pts[3]).ci, 3);
+});
+test('ROUTE_COLORS exposes Driven/Ahead css vars for the legend', () => {
+  assert.deepEqual(Object.values(ROUTE_COLORS).map((c) => c.label), ['Driven', 'Ahead']);
 });
