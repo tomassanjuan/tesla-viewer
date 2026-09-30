@@ -1,4 +1,4 @@
-// One shared busy indicator: a slim bar fixed to the top of the page (works in the phone layout too).
+// One shared busy indicator: a card centered mid-screen while anything loads (click-through, phone/safe-area aware).
 // task = busy.begin(label, total?) -> { set(done, total?, label?), end() }. No total => indeterminate.
 
 /** Pure state: tracks concurrent tasks; the newest one is shown. render(view|null) is called on every change. */
@@ -25,13 +25,14 @@ export function createBusy(render = () => {}) {
   };
 }
 
-/** DOM bar: <div id="busy" role="progressbar"> with a label and a <progress>-style fill. */
+/** DOM overlay: #busy fills the viewport (click-through) and centers a card with a label and a bar. */
 export function mountBusy(doc = document) {
   const box = doc.createElement('div'); box.id = 'busy'; box.hidden = true;
   box.setAttribute('role', 'progressbar'); box.setAttribute('aria-live', 'polite');
   const label = doc.createElement('span'), fill = doc.createElement('i');
   const track = doc.createElement('div'); track.className = 'busy-track'; track.append(fill);
-  box.append(label, track); doc.body.append(box);
+  const card = doc.createElement('div'); card.className = 'busy-card'; card.append(label, track);
+  box.append(card); doc.body.append(box);
   return createBusy((v) => {
     box.hidden = !v;
     if (!v) return;

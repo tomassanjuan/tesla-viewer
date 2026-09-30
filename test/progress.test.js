@@ -32,11 +32,13 @@ test('busy.run always ends the task, even when fn throws', async () => {
   assert.equal(b.view(), null);
 });
 
-test('busy bar: wired into app + export, styled for phone (safe-area), cached by sw', () => {
+test('busy bar: wired into app + export, centered click-through overlay, safe-area aware, cached by sw', () => {
   const read = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
   const app = read('js/app.js');
   for (const label of ['Scanning files', 'Reading telemetry', 'Loading video']) assert.ok(app.includes(label), label);
   assert.ok(read('js/export.js').includes('Exporting video'));
-  assert.ok(read('style.css').includes('safe-area-inset-top'));
+  const css = read('style.css');
+  assert.match(css, /#busy\{[^}]*inset:0[^}]*align-items:center[^}]*justify-content:center[^}]*pointer-events:none/);
+  assert.ok(css.includes('safe-area-inset-bottom'));
   assert.ok(read('sw.js').includes("'js/progress.js'"));
 });

@@ -348,11 +348,12 @@ canvas{background:transparent}
   #app.dash #stage{display:block}
 }
 
-/* shared busy bar (js/progress.js): fixed strip on top, safe-area aware for phones */
-#busy{position:fixed;top:0;left:0;right:0;z-index:50;padding:calc(6px + env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 6px max(12px,env(safe-area-inset-left));background:var(--bg,#111);color:var(--fg,#eee);font-size:12px;box-shadow:0 1px 6px #0006;pointer-events:none}
+/* shared busy overlay (js/progress.js): centered card; the wrapper is click-through so it never blocks the app */
+#busy{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));background:#0006;pointer-events:none}
 #busy[hidden]{display:none}
-#busy span{display:block;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.busy-track{height:4px;border-radius:2px;background:#8884;overflow:hidden}
+.busy-card{width:min(360px,100%);padding:16px 18px;border-radius:12px;background:var(--surface,#12151b);color:var(--fg,#eee);border:1px solid var(--border,#2a303c);box-shadow:0 8px 32px #0008;font-size:14px;text-align:center}
+.busy-card span{display:block;margin-bottom:10px;overflow-wrap:anywhere}
+.busy-track{height:6px;border-radius:3px;background:#8884;overflow:hidden}
 .busy-track i{display:block;height:100%;width:0;background:var(--accent,#3b82f6);transition:width .15s}
 #busy.indet .busy-track i{width:35%;animation:busy-slide 1.1s ease-in-out infinite}
 @keyframes busy-slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
