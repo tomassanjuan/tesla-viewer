@@ -163,6 +163,25 @@ test('clip without SEI opens with no HUD', async ({ page }) => {
   await expect(page.locator('#hud')).toBeHidden();
 });
 
+test('parsed clips are cached in IndexedDB and reused after a reload', async ({ page }) => {
+  await load(page);
+  await open(page, '2026-03-02_10-00-00');
+  await expect(page.locator('#hud')).toBeVisible();
+  await open(page, '2026-03-03_22-00-00');              // no SEI: proven from the head, cached as "no telemetry"
+  await expect(page.locator('#hud')).toBeHidden();
+  const n = () => page.evaluate(() => new Promise((res) => {
+    const r = indexedDB.open('tv-telemetry');
+    r.onsuccess = () => { const c = r.result.transaction('clips').objectStore('clips').count(); c.onsuccess = () => res(c.result); };
+  }));
+  await expect.poll(n).toBeGreaterThanOrEqual(2);
+  await page.reload();
+  await load(page);
+  await open(page, '2026-03-02_10-00-00');              // second visit: served from the cache, same telemetry
+  await expect(page.locator('#hud')).toBeVisible();
+  await page.locator('#stepF').click();
+  await expect(page.locator('#hud .h-speed b')).toHaveText(/^\d+$/);
+});
+
 test('telemetry HUD follows the playhead and the units switch', async ({ page }) => {
   await load(page);
   await open(page, '2026-03-02_10-00-00');

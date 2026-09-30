@@ -19,16 +19,8 @@ function findBoxes(dv, start, end, name) {
 }
 const findBox = (dv, start, end, name) => findBoxes(dv, start, end, name)[0] ?? null;
 
-/**
- * Parse a Tesla dashcam MP4 (ArrayBuffer): frame durations + per-frame SEI telemetry.
- * Returns { codec, width, height, duration, samples:[{t, ...telemetry}] }.
- * Telemetry is empty for clips without SEI (older firmware, parked, HEVC).
- */
-export function parseClip(buffer) {
-  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
-  const moov = findBox(dv, 0, dv.byteLength, 'moov');
-  const mdats = findBoxes(dv, 0, dv.byteLength, 'mdat');
-  if (!moov || !mdats.length) throw new Error('Not an MP4 (no moov/mdat)');
+/** Everything the moov box says: codec, size, creation time, frame durations (no mdat access). */
+function parseMoov(dv, u8, moov) {
   const mvhd = findBox(dv, moov.start, moov.end, 'mvhd');
   let created = null;
   if (mvhd) {
@@ -56,11 +48,28 @@ export function parseClip(buffer) {
     const c = dv.getUint32(p), d = dv.getUint32(p + 4);
     for (let j = 0; j < c; j++) durations.push(d / timescale);
   }
-
   const hevc = codec === 'hvc1' || codec === 'hev1';
+  let lenSize = 4;
   if (hevc) {
     const hvcC = findBox(dv, entry + 8 + 78, Math.min(entry + dv.getUint32(entry), stsd.end), 'hvcC');
-    const r = scanHevc(dv, u8, mdats[0], hvcC ? hvcCLengthSize(u8, hvcC.start) : 4, durations);
+    if (hvcC) lenSize = hvcCLengthSize(u8, hvcC.start);
+  }
+  return { codec, hevc, width, height, created, durations, lenSize };
+}
+
+/**
+ * Parse a Tesla dashcam MP4 (ArrayBuffer): frame durations + per-frame SEI telemetry.
+ * Returns { codec, width, height, duration, samples:[{t, ...telemetry}] }.
+ * Telemetry is empty for clips without SEI (older firmware, parked, HEVC).
+ */
+export function parseClip(buffer) {
+  const dv = new DataView(buffer), u8 = new Uint8Array(buffer);
+  const moov = findBox(dv, 0, dv.byteLength, 'moov');
+  const mdats = findBoxes(dv, 0, dv.byteLength, 'mdat');
+  if (!moov || !mdats.length) throw new Error('Not an MP4 (no moov/mdat)');
+  const { codec, hevc, width, height, created, durations, lenSize } = parseMoov(dv, u8, moov);
+  if (hevc) {
+    const r = scanHevc(dv, u8, mdats[0], lenSize, durations);
     return { codec, hevc, width, height, created, duration: durations.reduce((a, b) => a + b, 0) || r.duration, samples: r.samples };
   }
   const samples = [];
@@ -123,4 +132,40 @@ export async function probeSei(blob) {
     pos += size;
   }
   return null;
+}
+
+/** Top-level box headers of a Blob without reading payloads: [{ type, start, size }] (stops at the first mdat and moov, or `max` boxes). */
+async function topBoxes(blob, max = 16) {
+  const out = [];
+  for (let pos = 0; out.length < max && pos + 8 <= blob.size;) {
+    const h = new DataView(await blob.slice(pos, pos + 16).arrayBuffer());
+    if (h.byteLength < 8) break;
+    let size = h.getUint32(0);
+    if (size === 1 && h.byteLength >= 16) size = Number(h.getBigUint64(8));
+    else if (size === 0) size = blob.size - pos;
+    if (size < 8) break;
+    out.push({ type: ascii(h, 4), start: pos, size });
+    pos += size;
+  }
+  return out;
+}
+
+/**
+ * parseClip for a Blob/File, reading only what is needed. The moov (and a 64 KB slice of mdat) is enough to
+ * prove an H.264 clip has no Tesla SEI before its first frame, so such clips never have their mdat read.
+ * Anything unusual (HEVC, SEI present, odd layout, errors) falls back to the full parseClip.
+ */
+export async function parseClipBlob(blob) {
+  try {
+    const boxes = await topBoxes(blob);
+    const moov = boxes.find((b) => b.type === 'moov'), mdat = boxes.find((b) => b.type === 'mdat');
+    if (moov && mdat && moov.size < 2 ** 32) {
+      const buf = await blob.slice(moov.start, moov.start + moov.size).arrayBuffer();
+      const m = parseMoov(new DataView(buf), new Uint8Array(buf), { start: 8, end: buf.byteLength });
+      if (!m.hevc && await probeSei(blob) === false) {
+        return { codec: m.codec, hevc: false, width: m.width, height: m.height, created: m.created, duration: m.durations.reduce((a, b) => a + b, 0), samples: [] };
+      }
+    }
+  } catch { /* fall through to the full parse */ }
+  return parseClip(await blob.arrayBuffer());
 }

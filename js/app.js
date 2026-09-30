@@ -1,6 +1,7 @@
 import { groupFiles, groupEvents, sortEvents, GROUPS, SORTS, tsToDate, CAMS, formatEventInfo, CATEGORIES, EVENT_TYPES, RAW_PREFIX, eventType, countBy, filterEvents } from './library.js';
 import { init as initInsights } from './insights.js';
-import { parseClip, probeSei } from './mp4.js';
+import { parseClipBlob, probeSei } from './mp4.js';
+import { clipKey, getClip, setClip, getProbe, setProbe } from './telecache.js';
 import { GEAR, AUTOPILOT, csv } from './sei.js';
 import { updateTopbar } from './topbar.js';
 import { initExport } from './export.js';
@@ -155,23 +156,48 @@ function showTelemetry(e, el) {
 async function probeTelemetry(e, el) {
   const f = e.segments[0].cams.front ?? Object.values(e.segments[0].cams)[0];
   if (e.telemetry === undefined && f && !(encrypted.has(f) && !decrypted.has(f))) {
-    try { e.telemetry = await probeSei(resolve(f)); } catch { e.telemetry = null; }
+    try {
+      const key = clipKey(f);
+      let p = await getProbe(key);
+      if (p === undefined) { p = await probeSei(resolve(f)); if (p != null) setProbe(key, p); }
+      e.telemetry = p;
+    } catch { e.telemetry = null; }
   }
   showTelemetry(e, el);
 }
 
-// ---------- clip parsing (worker, main-thread fallback) ----------
-let worker, jobs = new Map(), jobId = 0;
+// ---------- clip parsing (worker pool, main-thread fallback) ----------
+const POOL = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 4) - 1));
+let workers = [], jobs = new Map(), jobId = 0;
+function spawnWorker() {
+  const w = new Worker(new URL('./telemetry-worker.js', import.meta.url), { type: 'module' });
+  w.load = 0;
+  w.onmessage = ({ data }) => { const j = jobs.get(data.id); jobs.delete(data.id); w.load--; data.error ? j.rej(new Error(data.error)) : j.res(data.clip); };
+  w.onerror = () => { workers = workers.filter((x) => x !== w); for (const [id, j] of jobs) if (j.w === w) { jobs.delete(id); j.rej(new Error('worker failed')); } };
+  return w;
+}
 function parseOffThread(blob) {
-  if (typeof Worker === 'undefined') return blob.arrayBuffer().then(parseClip);
+  if (typeof Worker === 'undefined') return parseClipBlob(blob);
   try {
-    if (!worker) {
-      worker = new Worker(new URL('./telemetry-worker.js', import.meta.url), { type: 'module' });
-      worker.onmessage = ({ data }) => { const j = jobs.get(data.id); jobs.delete(data.id); data.error ? j.rej(new Error(data.error)) : j.res(data.clip); };
-      worker.onerror = () => { worker = null; for (const j of jobs.values()) j.rej(new Error('worker failed')); jobs.clear(); };
-    }
-    return new Promise((res, rej) => { const id = ++jobId; jobs.set(id, { res, rej }); worker.postMessage({ id, blob }); });
-  } catch { return blob.arrayBuffer().then(parseClip); }
+    let w = workers.reduce((a, x) => (!a || x.load < a.load ? x : a), null);
+    if (!w || (w.load && workers.length < POOL)) workers.push(w = spawnWorker());
+    return new Promise((res, rej) => { const id = ++jobId; jobs.set(id, { res, rej, w }); w.load++; w.postMessage({ id, blob }); });
+  } catch { return parseClipBlob(blob); }
+}
+/** Cached parse: memory/IndexedDB hit skips all file reads. Uncacheable blobs (no name/lastModified) always parse. */
+async function parseCached(f) {
+  const key = clipKey(f);
+  const hit = key && await getClip(key);
+  if (hit) return hit;
+  const clip = await parseOffThread(resolve(f));
+  if (key) setClip(key, clip);
+  return clip;
+}
+/** Run fn over items with at most `limit` in flight; results keep item order. */
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length); let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => { while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); } }));
+  return out;
 }
 
 // ---------- event / player ----------
@@ -190,24 +216,36 @@ async function openEvent(e) {
   let blocked = 0, t0 = 0, hevc = false, withTel = 0, codec = '', firstErr = '';
   const load = busy.begin('Reading telemetry', segs.length);
   try {
-  for (const [si, s] of segs.entries()) {
-    load.set(si + 1);
-    s.start = t0; s.wall = tsToDate(s.ts).getTime();
-    const order = [...CAMS.filter((c) => s.cams[c]), ...Object.keys(s.cams).filter((c) => !CAMS.includes(c))];
-    if (order.every((c) => encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c]))) { blocked++; s.dur = 60; t0 += 60; continue; }
-    let dur = null;
-    for (const c of order) {
-      const f = s.cams[c];
-      if (encrypted.has(f) && !decrypted.has(f)) continue;
-      try {
-        const p = await parseOffThread(resolve(f));
-        codec ||= p.codec; dur ??= p.duration; hevc ||= p.hevc;
-        if (p.samples.length) { for (const m of p.samples) samples.push({ ...m, t: m.t + t0, _l: m.t, _s: s }); withTel++; s.telCam = c; break; }
-      } catch (err) { s.err = `${c}: ${err.message}`; firstErr ||= `${s.ts} ${s.err}`; }
+    let done = 0;
+    // Segments are independent: parse a few at a time, then lay them out in order below.
+    const res = await mapLimit(segs, 3, async (s) => {
+      s.wall = tsToDate(s.ts).getTime();
+      const order = [...CAMS.filter((c) => s.cams[c]), ...Object.keys(s.cams).filter((c) => !CAMS.includes(c))];
+      const r = { s, blocked: false, dur: null, clip: null, cam: null, err: '', codec: '', hevc: false };
+      if (order.every((c) => encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c]))) r.blocked = true;
+      else {
+        for (const c of order) {
+          const f = s.cams[c];
+          if (encrypted.has(f) && !decrypted.has(f)) continue;
+          try {
+            const p = await parseCached(f);
+            r.codec ||= p.codec; r.dur ??= p.duration; r.hevc ||= p.hevc;
+            if (p.samples.length) { r.clip = p; r.cam = c; break; }
+          } catch (err) { r.err = `${c}: ${err.message}`; }
+        }
+        r.dur ??= await probeDuration(resolve(s.cams[order.find((c) => !(encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c])))]));
+      }
+      load.set(++done);
+      return r;
+    });
+    for (const r of res) {
+      const s = r.s; s.start = t0;
+      if (r.blocked) { blocked++; s.dur = 60; t0 += 60; continue; }
+      if (r.err) { s.err = r.err; firstErr ||= `${s.ts} ${s.err}`; }
+      codec ||= r.codec; hevc ||= r.hevc;
+      if (r.clip) { for (const m of r.clip.samples) samples.push({ ...m, t: m.t + t0, _l: m.t, _s: s }); withTel++; s.telCam = r.cam; }
+      s.dur = r.dur; t0 += s.dur;
     }
-    s.dur = dur ?? await probeDuration(resolve(s.cams[order.find((c) => !(encrypted.has(s.cams[c]) && !decrypted.has(s.cams[c])))]));
-    t0 += s.dur;
-  }
   } finally { load.end(); }
   let pe = null;
   for (const s of segs) { s.gapBefore = pe == null ? 0 : Math.max(0, (s.wall - pe) / 1000); pe = s.wall + s.dur * 1000; if (s.gapBefore < GAP_MIN_S) s.gapBefore = 0; }
