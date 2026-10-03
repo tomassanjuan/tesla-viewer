@@ -87,6 +87,8 @@ export default {
   "No events match this filter.": "Brak zdarzeń pasujących do filtra.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria dostępna",
+  "Checking telemetry… {n} left": "Sprawdzanie telemetrii… zostało {n}",
+  "Only clips with telemetry": "Tylko klipy z telemetrią",
   "Group by": "Grupuj według",
   "No grouping": "Bez grupowania",
   "Day": "Dzień",
