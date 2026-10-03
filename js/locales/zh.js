@@ -87,6 +87,8 @@ export default {
   "No events match this filter.": "没有符合此筛选条件的事件。",
   "Telemetry": "遥测",
   "Telemetry available": "有遥测数据",
+  "Checking telemetry… {n} left": "正在检查遥测… 还剩 {n} 个",
+  "Only clips with telemetry": "仅显示有遥测数据的片段",
   "Group by": "分组方式",
   "No grouping": "不分组",
   "Day": "日期",
@@ -120,4 +122,5 @@ export default {
   "Show HUD": "显示 HUD",
   "Export enlarged cam only": "仅导出放大的摄像头",
   "Edit blur": "编辑模糊",
+  "Search clips": "搜索片段",
 };

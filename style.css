@@ -7,7 +7,7 @@
   --bg:#0b0d11;--surface:#12151b;--surface-2:#1a1e26;--surface-3:#242a35;
   --border:#2a303c;--fg:#eceef2;--mut:#98a1b0;
   --accent:#e31937;--accent-hi:#ff3b57;--on-accent:#fff;
-  --info:#5aa9ff;--ok:#34d27b;--warn:#f5a524;
+  --info:#5aa9ff;--throttle:#22d3ee;--ok:#34d27b;--warn:#f5a524;--signal:#22e05a;
   --route-driven:#5aa9ff;--route-ahead:rgba(152,161,176,.6); /* map route: shared with legend (Driven / Ahead) */
   --stage:#000;--glass:rgba(14,17,23,.82);--glass-b:rgba(255,255,255,.14);--hud-fg:#fff;--hud-mut:rgba(255,255,255,.62);
   --shadow-1:0 1px 2px rgba(0,0,0,.4);--shadow-2:0 8px 28px rgba(0,0,0,.45);
@@ -18,14 +18,14 @@
 @media (prefers-color-scheme:light){:root:not([data-theme=dark]){
   --bg:#f3f4f7;--surface:#fff;--surface-2:#f1f2f6;--surface-3:#e5e8ee;
   --border:#d9dde5;--fg:#14171d;--mut:#586170;
-  --accent:#d8132f;--accent-hi:#b90f27;--info:#1a6fd6;--ok:#12874b;--warn:#b26b00;
+  --accent:#d8132f;--accent-hi:#b90f27;--info:#1a6fd6;--throttle:#0891b2;--ok:#12874b;--warn:#b26b00;
   --route-driven:#1a6fd6;--route-ahead:rgba(88,97,112,.55);
   --shadow-1:0 1px 2px rgba(20,24,35,.08);--shadow-2:0 8px 28px rgba(20,24,35,.16);
   color-scheme:light;}}
 :root[data-theme=light]{
   --bg:#f3f4f7;--surface:#fff;--surface-2:#f1f2f6;--surface-3:#e5e8ee;
   --border:#d9dde5;--fg:#14171d;--mut:#586170;
-  --accent:#d8132f;--accent-hi:#b90f27;--info:#1a6fd6;--ok:#12874b;--warn:#b26b00;
+  --accent:#d8132f;--accent-hi:#b90f27;--info:#1a6fd6;--throttle:#0891b2;--ok:#12874b;--warn:#b26b00;
   --route-driven:#1a6fd6;--route-ahead:rgba(88,97,112,.55);
   --shadow-1:0 1px 2px rgba(20,24,35,.08);--shadow-2:0 8px 28px rgba(20,24,35,.16);
   color-scheme:light;}
@@ -41,7 +41,8 @@ h1,h2{margin:0}
 :focus-visible{box-shadow:var(--ring);border-radius:var(--r-sm)}
 .ic{width:18px;height:18px;flex:none;vertical-align:-4px}
 #app{display:grid;grid-template-columns:var(--side-w) minmax(0,1fr);height:100vh;height:100dvh}
-.side-off #app{grid-template-columns:0 minmax(0,1fr)}
+/* #side is display:none when collapsed, so main auto-places into column 1: leave a single column */
+.side-off #app{grid-template-columns:minmax(0,1fr)}
 
 /* ---------- buttons & fields ---------- */
 .btn,.ibtn{font:inherit;color:var(--fg);background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
@@ -107,6 +108,10 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .cam{contain:layout paint;position:relative;background:#050608;min-height:0;min-width:0;cursor:pointer;border-radius:var(--r-sm);overflow:hidden;outline:2px solid transparent;outline-offset:-2px;transition:outline-color .15s}
 .cam video{width:100%;height:100%;object-fit:contain;display:block}
 .cam>span{position:absolute;left:var(--s2);top:var(--s2);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:rgba(0,0,0,.7);padding:2px 8px;border-radius:var(--r-pill)}
+.cam-state{position:absolute;right:var(--s2);top:var(--s2);font:600 11px/1 system-ui,sans-serif;font-style:normal;color:#fff;padding:3px 8px;border-radius:var(--r-pill)}
+.cam-state:empty{display:none}
+.cam[data-state=stalled] .cam-state{background:#b45309}
+.cam[data-state=error] .cam-state{background:#b91c1c}
 .cam:hover{outline-color:rgba(255,255,255,.35)}
 .cam:focus-visible{outline-color:var(--info);box-shadow:none}
 .cam.main{outline-color:var(--accent)}
@@ -143,13 +148,18 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .h-wheel svg{width:44px;height:44px;transition:transform .08s linear}
 .h-wheel b{font-size:12px;font-weight:500}
 .h-pedals{display:flex;gap:var(--s3)}
-.h-bar{display:flex;flex-direction:column;align-items:center;gap:4px}
-.h-bar i{display:block;position:relative;width:10px;height:44px;border-radius:5px;background:rgba(255,255,255,.14);overflow:hidden}
-.h-bar i::after{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--v,0%);background:var(--ok);border-radius:5px}
-.h-bar.brake i::after{background:var(--accent-hi)}
+.h-bar{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:30px}
+.h-bar i{display:block;position:relative;width:16px;height:64px;border-radius:5px;background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);overflow:hidden}
+.h-bar i::after{content:"";position:absolute;left:0;right:0;bottom:0;height:var(--v,0%);background:var(--throttle);border-radius:4px}
+.h-bar.brake i::after{background:var(--accent)}
+.h-bar b{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.h-bar:not(.brake) b{color:var(--throttle)}
+.h-bar.brake b{color:var(--accent)}
 .h-turn{display:flex;gap:4px}
-.h-turn svg{width:24px;height:24px;color:rgba(255,255,255,.2)}
-.h-turn svg.on{color:var(--ok);filter:drop-shadow(0 0 6px var(--ok))}
+.h-turn svg{width:28px;height:28px;color:rgba(255,255,255,.22)}
+.h-turn svg.on{color:var(--signal,#22e05a);filter:drop-shadow(0 0 8px var(--signal,#22e05a));animation:h-blink 1s steps(1) infinite}
+@keyframes h-blink{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.h-turn svg.on{animation:none}}
 .h-ap{font-size:11px;font-weight:600;padding:3px 10px;border-radius:var(--r-pill);background:color-mix(in srgb,var(--info) 30%,transparent);border:1px solid var(--info);color:#cfe5ff;white-space:nowrap}
 .h-g{display:flex;flex-direction:column;align-items:center;gap:4px}
 .h-g i{position:relative;display:block;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2)}
@@ -161,7 +171,7 @@ main{display:flex;flex-direction:column;min-width:0;min-height:0}
 #bar{background:var(--surface);border-top:1px solid var(--border);padding:var(--s2) var(--s4) var(--s3);display:flex;flex-direction:column;gap:var(--s2)}
 .scrub{display:flex;align-items:center;gap:var(--s3)}
 .time{font-family:var(--mono);font-size:12px;color:var(--mut);min-width:84px;white-space:nowrap}
-#seekwrap{position:relative;flex:1;height:28px;display:flex;align-items:center;--p:0%;--in:0%;--out:100%}
+#seekwrap{--th:16px;position:relative;flex:1;height:28px;display:flex;align-items:center;--p:0%;--in:0%;--out:100%}
 #seek{-webkit-appearance:none;appearance:none;width:100%;height:28px;margin:0;background:transparent;cursor:pointer;position:relative;z-index:2}
 #seek::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(to right,var(--accent) var(--p),var(--surface-3) var(--p))}
 #seek::-moz-range-track{height:6px;border-radius:3px;background:var(--surface-3)}
@@ -263,7 +273,8 @@ canvas{background:transparent}
 #app.dash .h-gear i{width:calc(var(--d) * .5);height:calc(var(--d) * .5);font-size:calc(var(--d) * .26)}
 #app.dash .h-wheel svg{width:var(--d);height:var(--d)}
 #app.dash .h-wheel b{display:block;font-size:calc(var(--d) * .26)}
-#app.dash .h-bar i{width:calc(var(--d) * .22);height:var(--d)}
+#app.dash .h-bar i{width:calc(var(--d) * .3);height:var(--d)}
+#app.dash .h-bar b{font-size:calc(var(--d) * .22)}
 #app.dash .h-turn svg{width:calc(var(--d) * .5);height:calc(var(--d) * .5)}
 #app.dash .h-ap{font-size:calc(var(--d) * .24);padding:calc(var(--d) * .06) calc(var(--d) * .22)}
 #app.dash .h-g{display:flex}
@@ -283,7 +294,7 @@ canvas{background:transparent}
 #mbar{display:flex;align-items:center;gap:var(--s3);flex:none;min-height:40px;padding:var(--s1) var(--s3);background:var(--surface);border-bottom:1px solid var(--border)}
 #mbar b,#menuBtn{display:none}
 @media (max-width:860px),(orientation:landscape) and (max-height:520px) and (max-width:1000px){
-  :root{--mbar:calc(84px + env(safe-area-inset-top));--stage-h:min(calc(100vw * .66 + 82px),46dvh);--strip:82px}
+  :root{--mbar:calc(84px + env(safe-area-inset-top));--stage-h:min(calc(100vw / var(--ar,1.3333) + var(--strip-h,82px)),46dvh);--strip:82px}
   button,label,.cam{-webkit-tap-highlight-color:transparent}
   #app{display:block;height:100dvh;overflow:hidden}
   main{height:100dvh;display:grid;grid-template-columns:minmax(0,1fr);align-content:start;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
@@ -301,7 +312,9 @@ canvas{background:transparent}
   #scrim{display:block;position:fixed;inset:0;z-index:25;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s}
   .side-open #scrim{opacity:1;pointer-events:auto}
   #sideToggle,#sideResize{display:none}
-  .cat{min-height:36px}
+  .cat{min-height:34px}
+  .evgroup{top:calc(-1 * (var(--s4) + env(safe-area-inset-top)))}
+  .search,.libopts summary{min-height:44px}
 
   /* stage: one large camera + a swipeable strip of the others (tap a thumbnail to swap) */
   #stage{--strip:0px;position:sticky;top:var(--mbar);z-index:7;flex:none;height:var(--stage-h);display:flex;flex-direction:column;justify-content:flex-end}
@@ -328,6 +341,7 @@ canvas{background:transparent}
   .ibtn{width:44px;height:44px}.ibtn.play{width:52px;height:52px}
   .btn{min-height:44px}
   .time{min-width:78px}
+  #seekwrap{--th:26px}
   #seekwrap,#seek{height:44px}
   #seek{touch-action:none}
   #seek::-webkit-slider-runnable-track{height:8px;border-radius:4px}
@@ -381,7 +395,7 @@ canvas{background:transparent}
   .dock-row>.grp:first-child{top:calc(var(--mbar) + 40px);padding-bottom:var(--s1)}
   .ibtn{width:40px;height:40px}.ibtn.play{width:46px;height:46px}
   #seekwrap,#seek{height:40px}
-  main{grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr)}
+  main{grid-template-columns:minmax(0,min(calc((100dvh - var(--strip-h,82px)) * var(--ar,1.3333)),calc(100vw - 300px))) minmax(300px,1fr)}
   main>:not(#stage),#bar>*,.dock-row>*{grid-column:2}
   #stage,#app.dash #stage{grid-column:1;grid-row:1/span 40;top:0;height:100dvh}
   #app.dash #stage{display:block}
@@ -397,6 +411,8 @@ canvas{background:transparent}
 .lg-band{opacity:.5;border-radius:2px}
 .lg-bar{width:6px;height:10px;border-radius:1px}
 .lg-hatch{background:repeating-linear-gradient(45deg,var(--c),var(--c) 2px,transparent 2px,transparent 4px);border-radius:2px}
+.lg-sig-left,.lg-sig-right{width:16px;height:12px;background:var(--c);clip-path:polygon(40% 0,0 50%,40% 100%,40% 75%,100% 75%,100% 25%,40% 25%)}
+.lg-sig-right{transform:scaleX(-1)}
 .lg-dot{width:10px;border-radius:50%;border:1.5px solid #fff}
 @media (max-width:860px){.legend{padding:var(--s2) var(--s4) var(--s5);gap:var(--s2) var(--s3)}.lg-group{width:100%}}
 
@@ -415,3 +431,92 @@ canvas{background:transparent}
 #mbar+#topbar{border-top:0;padding-top:0}
 @media (min-width:861px) and (not (orientation:landscape) and (max-height:520px)){#mbar:has(+#topbar:not(:empty)){border-bottom:0}}
 @media (max-width:860px){#topbar{display:block;line-height:22px;height:max-content;align-self:start}#topbar>*{display:inline-block;margin-right:var(--s3);vertical-align:middle}.tb-diag{display:none}.apchip{display:inline-flex;margin-left:0}}
+
+/* ---------- UI polish: sidebar ---------- */
+#side{gap:var(--s2)}
+#status:empty,#vidwarn:empty{display:none}
+.eyebrow,.ctl-l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.eyebrow{margin:var(--s2) 0 0}
+.search{width:100%;min-height:36px;padding:0 var(--s3);font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm)}
+.search::placeholder{color:var(--mut)}
+.search:focus-visible{box-shadow:var(--ring);border-color:transparent}
+.cats{gap:6px;margin:0}
+.cat{min-height:28px;padding:0 10px;font-size:12px}
+.cat .n{margin-left:4px;font-weight:600;opacity:.65}
+.cat.on{font-weight:600}
+.cat.on .n{opacity:.9}
+/* filter chips: primary category row, then compact type chips under it */
+#evtype:not(:empty){padding-top:var(--s2);border-top:1px solid var(--border)}
+/* group & sort live behind one summary row that shows what is active */
+.libopts{margin:var(--s1) 0 0;padding:0;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surface-2)}
+.libopts summary{display:flex;align-items:center;gap:var(--s2);padding:0 var(--s3);min-height:36px;font-size:12px;color:var(--mut);list-style:none}
+.libopts summary::-webkit-details-marker{display:none}
+.libopts summary::before{content:"";width:6px;height:6px;flex:none;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.libopts[open] summary::before{transform:rotate(45deg)}
+.libopts summary:hover{color:var(--fg)}
+.libopts summary:focus-visible{border-radius:var(--r-sm)}
+.libopts .ctl{margin:0;padding:0 var(--s3) var(--s3)}
+.ctl{gap:6px}
+.ctl-l{margin-top:var(--s1)}
+/* clip cards: small thumbnail beside the title and meta */
+.ev{padding:var(--s2) var(--s3)}
+.ev-thumb{grid-column:1;grid-row:2/span 3;align-self:start;width:88px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;margin:0;background:var(--bg)}
+.ev:has(.ev-thumb){grid-template-columns:88px minmax(0,1fr) auto}
+.ev:has(.ev-thumb) .ttl{grid-column:1/3;grid-row:1}
+.ev:has(.ev-thumb) small{grid-column:2/-1}
+.ev:has(.ev-thumb) .when{grid-column:2/-1}
+.ev:has(.ev-thumb) .badge{grid-column:3;grid-row:1}
+.ev small{color:var(--mut);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* sticky group headers */
+.evgroup{position:sticky;top:calc(-1 * var(--s4));z-index:2;background:var(--surface);margin:var(--s2) 0 0;padding:var(--s1) 0;text-transform:uppercase;letter-spacing:.06em;font-size:11px;box-shadow:0 1px 0 var(--border)}
+#events{gap:0}
+.evgroup-list{padding:var(--s2) 0}
+
+/* ---------- UI polish: legend ---------- */
+.legend{font-size:12px;gap:var(--s2) var(--s5);padding:var(--s3) var(--s4) var(--s4);border-top:1px solid var(--border)}
+.lg-group{gap:var(--s1) var(--s4)}
+.lg-group>b{padding:2px 8px;border-radius:var(--r-pill);background:var(--surface-2);letter-spacing:.08em}
+.lg-sw{width:18px}
+
+/* ---------- UI polish: desktop header + control dock (phone layout untouched) ---------- */
+@media (min-width:861px) and (not ((orientation:landscape) and (max-height:520px) and (max-width:1000px))){
+  /* one header row: clip info on the left, version + language on the right */
+  main{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(min(40dvh,480px),1fr) auto auto auto;background:var(--surface);overflow-y:auto}  /* stage keeps at least 40% of the height (panels scroll) so short windows don't squash the video */
+  #app.dash main{grid-template-rows:auto minmax(0,1.1fr) auto minmax(0,1fr) auto}
+  #mbar{grid-area:1/2;border-bottom:0;min-height:48px;padding:var(--s1) var(--s4) var(--s1) var(--s2)}
+  #topbar{grid-area:1/1;border-bottom:0;background:none;min-height:48px;padding:var(--s1) var(--s4);gap:var(--s1) var(--s3);color:var(--mut)}
+  #topbar .tb-name{font-size:15px;color:var(--fg)}
+  #topbar .apchip{margin-left:0}
+  #topbar .tb-diag{margin-left:auto}
+  #stage{grid-area:2/1/3/-1;border-top:1px solid var(--border)}
+  #bar{grid-area:3/1/4/-1;padding:var(--s3) var(--s4) var(--s4);gap:var(--s1)}
+  #panels{grid-area:4/1/5/-1}
+  #legend{grid-area:5/1/6/-1}
+  /* dock: row 1 = playback (transport, speed/view/units/load, tools); row 2 = clip actions (trim, export, options) */
+  .dock-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 var(--s5)}
+  .dock-row>.grp:first-child{grid-area:1/1}
+  .dock-row>.grp:nth-child(2){grid-area:1/2/2/-1;gap:var(--s2) var(--s3)}
+  #gapgrp{grid-area:2/1/3/-1;margin-top:var(--s3)}
+  .trimgrp,.dock-row>.grp.end{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--border);align-self:start}
+  .trimgrp{grid-area:3/1/4/3}
+  .dock-row>.grp.end{grid-area:3/3;margin-left:0}
+  .trimgrp .btn.primary+.chip{margin-left:auto}
+  .trimgrp #trimInfo{align-self:center}
+  .chip{min-height:36px;padding:0 var(--s3);font-size:13px}
+  .chip:has(input:checked){background:var(--surface-2)}
+  .grp.end .ibtn,#extras-dock .blur-btn{width:36px;height:36px;border-radius:var(--r-sm)}
+  #extras-dock .blur-btn{width:auto;padding:0 var(--s3)}
+}
+.ev b{font-size:13px}
+.ev .badge{padding:0 7px}
+.ev b{font-size:12.5px;letter-spacing:-.015em}.ev .ttl{gap:6px}
+
+/* event-type icon chips (name lives in title/aria-label; long press shows it in #evhint on touch) */
+.cat-ic{display:inline-flex;align-items:center;gap:2px;min-width:44px;justify-content:center;padding:0 8px;-webkit-touch-callout:none;user-select:none}
+.tic{flex:none;display:block}
+.cat-ic .n{margin-left:2px}
+.cat-tele[aria-busy="true"] .n{opacity:.5}
+.evhint{margin:0;font-size:12px;color:var(--mut)}
+.ev small .ic-ty{display:inline-flex;vertical-align:middle;margin-right:var(--s2);color:var(--fg)}
+.evgroup .lbl .tic{vertical-align:-3px;margin-right:6px}
+@media (max-width:860px){#cats .cat,#evtype .cat{min-height:34px}.cat-ic{min-width:48px}}

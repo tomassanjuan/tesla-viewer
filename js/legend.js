@@ -3,7 +3,7 @@
 import { t } from './i18n.js';
 
 export const COLOR = {
-  speed: '--fg', ap: '--info', throttle: '--info', brake: '--accent', playhead: '--accent',
+  speed: '--fg', ap: '--info', throttle: '--throttle', brake: '--accent', playhead: '--accent',
   played: '--accent', gap: '--warn', trim: '--warn', driven: '--route-driven', ahead: '--route-ahead', position: '--accent',
 };
 
@@ -12,8 +12,16 @@ export const TICKS = {
   brake: { color: '#e31937', label: 'Hard braking' },
   accel: { color: '#f5a524', label: 'Hard acceleration' },
   turn: { color: '#a78bfa', label: 'Sharp turn' },
-  'ap-on': { color: '#3ecf8e', label: 'Autopilot engaged' },
+  'ap-on': { color: '#5aa9ff', label: 'Autopilot engaged' },
   'ap-off': { color: '#8b93a1', label: 'Autopilot disengaged' },
+  trigger: { color: '#ff5cf0', label: 'Event trigger' }, // clip's own event.json reason at its trigger time (e.g. automatic emergency braking)
+};
+
+// Turn indicators: one definition (color, label, arrow path in a 24x24 box) for the HUD icons, timeline lane, tooltips and legend.
+export const SIGNAL_COLOR = '#22e05a';
+export const SIGNALS = {
+  left: { color: SIGNAL_COLOR, label: 'Left indicator', path: 'M10 4L2 12l8 8v-5h12V9H10z' },
+  right: { color: SIGNAL_COLOR, label: 'Right indicator', path: 'M14 4l8 8-8 8v-5H2V9h12z' },
 };
 
 // kind selects the swatch shape (see .lg-* in style.css); color is a CSS var name or literal color.
@@ -30,6 +38,7 @@ export const LEGEND = [
     { kind: 'hatch', color: COLOR.gap, label: 'Clip gap' },
     { kind: 'bar', color: COLOR.trim, label: 'Trim start / end' },
     ...Object.values(TICKS).map((k) => ({ kind: 'bar', color: k.color, label: k.label })),
+    ...Object.entries(SIGNALS).map(([side, k]) => ({ kind: `sig-${side}`, color: k.color, label: k.label })),
   ] },
   { id: 'map', title: 'Map', items: [
     { kind: 'line', color: COLOR.driven, label: 'Driven' },

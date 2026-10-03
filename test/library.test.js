@@ -40,3 +40,54 @@ test('a consistent repeating gap keeps clips in one group; a lone or irregular g
   const ev = groupFiles([0, 5, 10, 15, 50, 55].map(at));
   assert.deepEqual(ev.map((e) => e.segments.length).sort(), [2, 4]);
 });
+
+test('filterEvents free-text search: every word must match name, reason, place or city (case-insensitive)', async () => {
+  const { filterEvents } = await import('../js/library.js');
+  const evs = [
+    { name: '2026-03-04_09-00-00', info: { reason: 'Honk', place: 'Calle Mayor, Madrid' } },
+    { name: '2026-03-03_22-00-00', info: { reason: 'Sentry: object detected', place: 'Rue X, Paris' }, city: 'Paris' },
+    { name: '2026-03-02_10-00-00' },
+  ];
+  assert.equal(filterEvents(evs, { q: '' }).length, 3);
+  assert.equal(filterEvents(evs, { q: 'madrid' }).length, 1);
+  assert.equal(filterEvents(evs, { q: 'SENTRY paris' }).length, 1);
+  assert.equal(filterEvents(evs, { q: 'honk paris' }).length, 0);
+  assert.equal(filterEvents(evs, { q: '2026-03-02' })[0].name, '2026-03-02_10-00-00');
+});
+
+test('filterEvents tele: only clips whose probe found telemetry; combines with category and search', async () => {
+  const { filterEvents } = await import('../js/library.js');
+  const evs = [
+    { name: 'a', category: 'saved', telemetry: true },
+    { name: 'b', category: 'saved', telemetry: false },
+    { name: 'c', category: 'sentry', telemetry: null },
+    { name: 'd', category: 'sentry' },
+    { name: 'e', category: 'sentry', telemetry: true },
+  ];
+  assert.equal(filterEvents(evs, { tele: true }).length, 2);
+  assert.equal(filterEvents(evs, { tele: false }).length, 5);
+  assert.deepEqual(filterEvents(evs, { tele: true, category: 'sentry' }).map((e) => e.name), ['e']);
+  assert.deepEqual(filterEvents(evs, { tele: true, q: 'a' }).map((e) => e.name), ['a']);
+});
+
+test('macOS AppleDouble sidecars and OS junk never become clips, even when they follow the real file', () => {
+  const d = 'TeslaCam/SavedClips/2026-06-01_10-00-00/', ts = '2026-06-01_10-00-00';
+  const real = f(`${d}${ts}-front.mp4`), side = f(`${d}._${ts}-front.mp4`);
+  const ev = groupFiles([real, side, f(`${d}.DS_Store`), f(`${d}._event.json`)]);
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].segments[0].cams.front, real.file);   // the sidecar (listed last) must not replace the real clip
+  // a folder holding only sidecars yields no clip at all
+  assert.equal(groupFiles([f(`TeslaCam/RecentClips/._2026-06-01_10-00-00-back.mp4`)]).length, 0);
+  assert.equal(groupFiles([f(`TeslaCam/RecentClips/2026-06-01_10-00-00-back.mp4`)]).length, 1);
+});
+
+test('isJunk: sidecars, .DS_Store, Thumbs.db, empty and non-mp4-header tiny files', async () => {
+  const { isJunkName, looksLikeMp4OrTesla } = await import('../js/library.js');
+  for (const n of ['._a.mp4', 'x/._a.mp4', '.DS_Store', 'Thumbs.db']) assert.ok(isJunkName(n), n);
+  for (const n of ['2026-06-01_10-00-00-front.mp4', 'event.json', 'a._b.mp4']) assert.ok(!isJunkName(n), n);
+  const ftyp = new Uint8Array([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70, 0, 0, 0, 0]);
+  assert.ok(looksLikeMp4OrTesla(ftyp, 5e6));
+  assert.ok(!looksLikeMp4OrTesla(new Uint8Array(4096).fill(7), 4096));   // AppleDouble-sized garbage
+  assert.ok(!looksLikeMp4OrTesla(new Uint8Array(0), 0));
+  assert.ok(looksLikeMp4OrTesla(new Uint8Array(8192).fill(7), 9e6));     // big non-ftyp file may be an encrypted Tesla clip
+});

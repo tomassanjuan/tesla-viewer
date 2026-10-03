@@ -87,6 +87,8 @@ export default {
   "No events match this filter.": "Nenhum evento corresponde a este filtro.",
   "Telemetry": "Telemetria",
   "Telemetry available": "Telemetria disponível",
+  "Checking telemetry… {n} left": "A verificar telemetria… faltam {n}",
+  "Only clips with telemetry": "Apenas clipes com telemetria",
   "Group by": "Agrupar por",
   "No grouping": "Sem agrupamento",
   "Day": "Dia",
@@ -120,4 +122,5 @@ export default {
   "Show HUD": "Mostrar HUD",
   "Export enlarged cam only": "Exportar só a câmera ampliada",
   "Edit blur": "Editar desfoque",
+  "Search clips": "Pesquisar clipes",
 };
