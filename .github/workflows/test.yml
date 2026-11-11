@@ -1,4 +1,4 @@
-# Tests only. Deploys and PR previews come from Cloudflare Workers Builds (repo integration).
+# Tests only. Deploys: see README (wrangler deploy or Cloudflare dashboard CI).
 name: test
 on:
   pull_request:

@@ -1,6 +1,6 @@
 # Roadmap
 
-Goal: a free, fully on-device alternative to tesclip.com. Static site, no backend, no uploads, no build step.
+Goal: a free, fully on-device viewer for TeslaCam clips. Static site, no backend, no uploads, no build step.
 
 ## Format facts (basis for the design)
 - Clips are `YYYY-MM-DD_HH-MM-SS-<camera>.mp4`, ~1 min each, one file per camera
